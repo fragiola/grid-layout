@@ -37,7 +37,13 @@ const IMPORT_REACT =
  * here starts with a line comment naming the project, its copyright and the MIT licence, and the
  * root LICENSE carries that project's notice.
  */
-const DERIVED: { file: string; from: keyof typeof NOTICES }[] = [];
+const DERIVED: { file: string; from: keyof typeof NOTICES }[] = [
+    { file: "src/layout/compact.ts", from: "react-grid-layout" },
+    { file: "src/layout/geometry.ts", from: "react-grid-layout" },
+    { file: "src/layout/move.ts", from: "react-grid-layout" },
+    { file: "src/layout/normalise.ts", from: "react-grid-layout" },
+    { file: "src/layout/resize.ts", from: "react-grid-layout" },
+];
 
 /** What a derived file's header and the root LICENSE must name, per reference project. */
 const NOTICES = {
