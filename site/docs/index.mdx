@@ -1,0 +1,22 @@
+---
+title: Grid Layout — headless draggable grids for React
+description: A headless grid layout for React. It ships dragging, resizing, collisions, compaction, the keyboard and RTL; the markup and every pixel are yours.
+layout: landing
+---
+
+<Hero
+    eyebrow="@fragiola/grid-layout · React"
+    title="Dashboards that move, and not a line of CSS from us."
+    description="A headless grid layout: items that drag and resize on a grid, push each other out of the way and settle. The keyboard and right-to-left come built in, and how it looks is up to you."
+    actions={[
+        { label: "Roadmap", href: "/docs/limitations", variant: "primary" },
+        { label: "GitHub", href: "https://github.com/fragiola/grid-layout", variant: "ghost" },
+    ]}
+/>
+
+<Section title="What it never ships">
+<Pills strike items={["CSS", "Icons", "Handles you cannot restyle", "Text", "A design system"]} />
+
+The state is exposed as data-\* attributes and ARIA, so any styling solution works: Tailwind,
+plain CSS, CSS modules, CSS-in-JS.
+</Section>
