@@ -1,20 +1,30 @@
 ---
 title: Limitations and roadmap
-description: What is not built yet and the order the next steps will come in, from the walking skeleton to external drops, responsive grids and constraints.
+description: What is not built yet, what the examples do meanwhile, and the order the next steps will come in.
 ---
 
-Grid Layout is being built. This page lists what is still missing and the order the next steps
-come in.
+This is the walking skeleton: the layout rules, the model, the engine, the React primitives, the
+keyboard and right-to-left. Much of a full grid layout is still to come.
+
+## The gaps
+
+| missing | what the examples do meanwhile |
+| --- | --- |
+| No way to reach the model from outside `GridLayout.Root`. | Hold the layout in your state ([`messy-layout`](/examples/messy-layout)), or put the part that needs the model inside the root ([`keyboard`](/examples/keyboard)). |
+| On touch, an item's **body** does not drag: the page scrolls. | A drag handle or a resize handle takes touch at once. Long-press on bodies comes with responsive and mobile grids. |
+| No **dragging in from outside** the grid (a sidebar of widgets, files). | Add with a button ([`add-remove-items`](/examples/add-remove-items)). |
+| No **breakpoints**: one layout, whatever the width. | Fewer `cols` on a narrow screen, chosen by the app. |
+| No **constraints** beyond an item's own limits (aspect ratios, snapping), no wrap or fast compactor. | `minW`, `maxW`, `minH`, `maxH`, and middleware on `item.resize`. |
+| With `allowOverlap`, no **bring to front**: the layout's order is the drawing order. | Reorder the layout. |
+| No auto-scroll near the edges of a scrolling page during a drag. | Keep long dashboards in view, or drag in steps. |
 
 ## The roadmap
 
-1. **Walking skeleton**: the layout rules, the model, the engine, the React primitives, the
-   keyboard, right-to-left and the first examples.
-2. **External drag and drop**: widgets dragged in from outside the grid, a toolbox, drop rules,
+1. **External drag and drop**: widgets dragged in from outside the grid, a toolbox, drop rules,
    files, dragging out to remove.
-3. **Responsive and mobile**: breakpoints by container width, layouts per breakpoint, long-press
+2. **Responsive and mobile**: breakpoints by container width, layouts per breakpoint, long-press
    touch, edge auto-scroll.
-4. **Constraints, compactors and positioning**: pluggable constraints, aspect ratios, wrap and
+3. **Constraints, compactors and positioning**: pluggable constraints, aspect ratios, wrap and
    fast compactors, scaled containers, a grid background.
-5. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
+4. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
    Layout.

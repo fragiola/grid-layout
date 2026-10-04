@@ -1,0 +1,20 @@
+---
+title: Right-to-left
+description: Logical columns and sides, the direction the grid reads, and what changes for the keys and the pointer.
+---
+
+A layout is the same data in either direction: `x` counts from the inline-start edge. In
+right-to-left the first column is on the right, the `start` side is the right edge, and the
+`bottom-end` corner is the bottom-left one.
+
+The grid reads its direction from `Root`'s `dir` prop (set on the element too), or from the root's
+computed `direction`. Pointer gestures and the keys follow what they show.
+
+```tsx title="arabic.tsx"
+<GridLayout.Root dir="rtl" defaultLayout={layout}>…</GridLayout.Root>
+```
+
+Place your handles with logical properties (`inset-inline-end`, Tailwind's `end-0`) and they mirror
+for free.
+
+<Example id="rtl-layout" />

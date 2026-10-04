@@ -1,0 +1,110 @@
+---
+title: Your first grid
+description: From a layout of plain objects to a dashboard that drags, resizes and pushes, then styled from outside.
+---
+
+This page builds the grid of the [`hello-grid`](/examples/hello-grid) example, step by step.
+
+<Steps>
+
+<Step>
+
+## Describe the layout
+
+A layout is an array of items in grid units: `x` and `y` are the first column and row, `w` and
+`h` the width and height in columns and rows. `id` names each item.
+
+```tsx title="layout.ts"
+import type { Layout } from "@fragiola/grid-layout-react";
+
+export const layout: Layout = [
+    { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+    { id: "orders", x: 4, y: 0, w: 4, h: 2 },
+    { id: "visitors", x: 8, y: 0, w: 4, h: 2 },
+];
+```
+
+</Step>
+
+<Step>
+
+## Render the grid
+
+`Root` takes the layout and the grid's measurements; `Items` hands you each item to render. The
+item is yours: put anything inside.
+
+```tsx title="dashboard.tsx"
+import { GridLayout } from "@fragiola/grid-layout-react";
+
+export function Dashboard() {
+    return (
+        <GridLayout.Root defaultLayout={layout} cols={12} rowHeight={64} gap={[12, 12]}>
+            <GridLayout.Items>
+                {(item) => (
+                    <GridLayout.Item itemId={item.id} aria-label={item.id}>
+                        {item.id}
+                    </GridLayout.Item>
+                )}
+            </GridLayout.Items>
+        </GridLayout.Root>
+    );
+}
+```
+
+It already drags: press an item and move. It has no look: the next step gives it one.
+
+</Step>
+
+<Step>
+
+## Add a handle and a placeholder
+
+A `ResizeHandle` is a side or corner the item is resized from; a `Placeholder` shows where the
+held item would land. Neither has a look or a size of its own.
+
+```tsx title="dashboard.tsx"
+<GridLayout.Item itemId={item.id} aria-label={item.id} className="card">
+    {item.id}
+    <GridLayout.ResizeHandle side="bottom-end" aria-label={`Resize ${item.id}`} className="corner" />
+</GridLayout.Item>
+
+<GridLayout.Placeholder className="placeholder" />
+```
+
+</Step>
+
+<Step>
+
+## Style the parts
+
+Every part takes `className` (a string, or a function of its state) and exposes its state as
+`data-*` attributes.
+
+```css title="dashboard.css"
+.card { border: 1px solid #ddd; border-radius: 8px; background: white; cursor: grab; }
+.card:not([data-dragging]) { transition: transform 160ms, width 160ms, height 160ms; }
+.card[data-dragging] { cursor: grabbing; box-shadow: 0 12px 28px rgb(0 0 0 / 0.16); }
+.corner { position: absolute; inset-inline-end: 0; bottom: 0; width: 14px; height: 14px; }
+.placeholder { border: 2px dashed royalblue; border-radius: 8px; }
+```
+
+</Step>
+
+<Step>
+
+## Keep the changes
+
+`onLayoutChange` tells you the layout after every committed change, once: never during a
+gesture. Save it, or hold the layout in your state and pass it as `layout`.
+
+```tsx title="dashboard.tsx"
+const [layout, setLayout] = useState(start);
+
+<GridLayout.Root layout={layout} onLayoutChange={setLayout}>…</GridLayout.Root>
+```
+
+</Step>
+
+</Steps>
+
+<Example id="hello-grid" />

@@ -1,0 +1,36 @@
+---
+title: Columns, rows and gaps
+description: How the grid turns columns and rows into pixels, what each measurement does, and how the root sizes itself.
+---
+
+The grid's measurements decide where items are, so they are the grid's own configuration, never
+CSS. Everything else about the look is yours.
+
+| prop | default | what it is |
+| --- | --- | --- |
+| `cols` | `12` | the columns, sharing the root's width |
+| `rowHeight` | `150` | one row's height, in pixels |
+| `gap` | `[10, 10]` | the space between items, inline then block, in pixels |
+| `padding` | the gap | the space between the root's edge and the items |
+| `maxRows` | none | the rows a gesture may reach |
+| `autoSize` | `true` | the root's height follows the layout |
+| `width` | measured | a fixed width, for server rendering or tests |
+
+## From grid units to pixels
+
+A column is the root's width, less the padding and the gaps, divided by `cols`. An item spanning
+`w` columns is `w` columns plus the `w − 1` gaps between them. Positions are rounded to whole pixels,
+and the gap between two neighbours is always exactly `gap`, whatever the rounding.
+
+## The root
+
+`GridLayout.Root` is positioned, and the items are placed inside its padding box: use the `padding`
+prop rather than CSS padding to put room around them. With `autoSize`, its height is set to hold
+every row; without it, give it a height yourself.
+
+<Callout type="warn" title="Server rendering">
+Without a `width`, the root measures itself in the browser and renders its items once it knows its
+width. Give a `width` to render the items on the server.
+</Callout>
+
+<Example id="unstyled" />

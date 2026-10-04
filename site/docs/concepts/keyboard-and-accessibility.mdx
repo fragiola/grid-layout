@@ -1,0 +1,41 @@
+---
+title: Keyboard and accessibility
+description: Moving and resizing items without a pointer, what the grid tells you at each step, and the names and words that are yours.
+---
+
+Every item is a tab stop (its drag handle, when it has one).
+
+| key | what it does |
+| --- | --- |
+| Space or Enter | grabs the item, or drops the grabbed one |
+| Arrows | move the grabbed item a cell |
+| Shift + arrows | resize it from its end and bottom edges |
+| Escape | puts it back where it was |
+| Tab | puts it back, and moves the focus on |
+
+The arrows follow what they show: in right-to-left, ArrowRight moves toward the inline start. A step
+a middleware would refuse is not taken. A drop commits one command.
+
+## Replacing a key
+
+Your `onKeyDown` on `Root` runs first: `preventDefault` cancels or replaces any of these keys.
+
+## What is said
+
+The primitives set no role, no name and no text. The grid tells you each step (`grab`, `move`,
+`resize`, `drop`, `cancel`) through `useGridLayoutEvents`; say it in a live region in your own
+words.
+
+```tsx title="announcer.tsx"
+function Announcer({ onMessage }: { onMessage: (message: string) => void }) {
+    useGridLayoutEvents((event) => {
+        if (event.type === "drop") onMessage(`Moved to column ${event.item.x + 1}, row ${event.item.y + 1}.`);
+    });
+    return null;
+}
+```
+
+Give each item a name (`aria-label`) and describe what it is (`aria-roledescription`), and tell
+people the keys (`aria-describedby`).
+
+<Example id="keyboard" />

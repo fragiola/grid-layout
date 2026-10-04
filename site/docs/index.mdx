@@ -9,14 +9,60 @@ layout: landing
     title="Dashboards that move, and not a line of CSS from us."
     description="A headless grid layout: items that drag and resize on a grid, push each other out of the way and settle. The keyboard and right-to-left come built in, and how it looks is up to you."
     actions={[
-        { label: "Roadmap", href: "/docs/limitations", variant: "primary" },
+        { label: "Read the docs", href: "/docs/getting-started/introduction", variant: "primary" },
+        { label: "Browse {examples} examples", href: "/examples", variant: "secondary" },
         { label: "GitHub", href: "https://github.com/fragiola/grid-layout", variant: "ghost" },
     ]}
 />
+
+<Example
+    id="styling-showcase"
+    variant="showcase"
+    theme="light"
+    height={540}
+    label="Drag a card, pull a corner, try another theme:"
+/>
+
+<Features columns={4}>
+<Feature title="Drag and resize">
+One pointer path for mouse, touch and pen. Eight logical resize sides, a placeholder where the
+item will land, and a click that stays a click.
+</Feature>
+<Feature title="Collisions that settle">
+Items push what they land on, then settle: vertical, horizontal or not at all, with statics that
+never move and collisions you can prevent.
+</Feature>
+<Feature title="Keyboard and RTL">
+Grab, move, resize and drop from the keyboard, with events to announce each step. Right-to-left is
+a mirror, not a fork.
+</Feature>
+<Feature title="Every change a command">
+The layout lives in a typed model. Every change is a command your middleware can refuse or
+rewrite, from a drag, a key or your own code.
+</Feature>
+</Features>
 
 <Section title="What it never ships">
 <Pills strike items={["CSS", "Icons", "Handles you cannot restyle", "Text", "A design system"]} />
 
 The state is exposed as data-\* attributes and ARIA, so any styling solution works: Tailwind,
-plain CSS, CSS modules, CSS-in-JS.
+plain CSS, CSS modules, CSS-in-JS. The examples use Fragiola UI and its palettes.
+</Section>
+
+<Section title="A layout is plain data">
+Items are objects in grid units. Render them how you like; the grid places them and moves them.
+
+```tsx title="dashboard.tsx"
+const layout = [
+    { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+    { id: "orders", x: 4, y: 0, w: 4, h: 2, minW: 2 },
+    { id: "banner", x: 8, y: 0, w: 4, h: 1, static: true },
+];
+
+<GridLayout.Root defaultLayout={layout} onLayoutChange={save}>
+    <GridLayout.Items>
+        {(item) => <GridLayout.Item itemId={item.id}>{item.id}</GridLayout.Item>}
+    </GridLayout.Items>
+</GridLayout.Root>
+```
 </Section>

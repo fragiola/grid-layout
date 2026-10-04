@@ -1,0 +1,35 @@
+---
+title: Saving a layout
+description: Save the layout when it changes and start from it next time; the grid tells you once per change, never mid-gesture.
+---
+
+Saving is the app's: the grid tells you every committed change, once, and starts from the layout
+you give it.
+
+```tsx title="saved-dashboard.tsx"
+const KEY = "dashboard-layout";
+
+function load(): Layout | undefined {
+    try {
+        const raw = localStorage.getItem(KEY);
+        return raw ? JSON.parse(raw) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+<GridLayout.Root
+    defaultLayout={load() ?? defaults}
+    onLayoutChange={(layout) => localStorage.setItem(KEY, JSON.stringify(layout))}
+>
+    …
+</GridLayout.Root>
+```
+
+A saved layout from an older version of your app is checked and corrected like any other: unknown
+sizes come back within their limits, and items past the columns move in.
+
+To reset, forget what you saved and start a new grid (a new `key`): `defaultLayout` is read when a
+grid starts.
+
+<Example id="save-restore" />

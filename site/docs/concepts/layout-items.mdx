@@ -1,0 +1,33 @@
+---
+title: Layout items
+description: What an item of the layout holds, how a layout is checked and corrected, and how to hold it controlled or not.
+---
+
+An item is a plain object in grid units.
+
+| field | what it is |
+| --- | --- |
+| `id` | unique in the layout |
+| `x`, `y` | its first column (from the inline-start edge) and row |
+| `w`, `h` | its width in columns and height in rows |
+| `minW`, `maxW`, `minH`, `maxH` | the sizes a resize may reach |
+| `static` | it never moves, by a person or by compaction |
+| `draggable`, `resizable` | `false` to keep people from dragging or resizing it |
+
+## Checked and corrected
+
+Any layout the grid is given is checked, then corrected and settled: an item past the last column
+moves back in, one left of the first moves in keeping its width, sizes come back within their
+limits, overlapping statics move apart, and `y: Infinity` means "below everything before it".
+A layout that cannot be used (a duplicated id, a size of zero) is refused with what is wrong.
+
+## Controlled or not
+
+`defaultLayout` is where the grid starts, and the grid keeps the changes. `layout` with
+`onLayoutChange` keeps the layout in your state: the grid shows yours, and a change you do not take
+back is undone.
+
+`onLayoutChange` is told once per committed change, never during a gesture, and on mount only when
+the layout you gave had to be corrected.
+
+<Example id="add-remove-items" />

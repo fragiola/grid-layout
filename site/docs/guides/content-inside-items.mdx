@@ -1,0 +1,34 @@
+---
+title: Content inside items
+description: Fields, buttons, charts and frames inside items, and how to keep them working while items drag around them.
+---
+
+An item holds anything. A few things to know when it holds controls.
+
+## Controls never start a drag
+
+A press on a field, a button, a link, a select or editable text works as usual: it never starts a
+drag. Mark any other subtree that should not drag (a chart you pan, a slider) with
+`data-grid-layout-no-drag`.
+
+```tsx title="chart-card.tsx"
+<GridLayout.Item itemId="revenue">
+    <h3>Revenue</h3>
+    <div data-grid-layout-no-drag>
+        <PannableChart />
+    </div>
+</GridLayout.Item>
+```
+
+## Or drag only from a handle
+
+With a `GridLayout.DragHandle`, the item drags from the handle alone, and the handle is the item's
+tab stop: the body is free for its content.
+
+## Frames and images
+
+An `iframe` swallows the pointer: while an item is held, cover frames (for example with
+`[data-dragging] iframe { pointer-events: none }` on the root). Images and selected text never
+start the browser's own drag while an item is pressed.
+
+<Example id="drag-handle" />

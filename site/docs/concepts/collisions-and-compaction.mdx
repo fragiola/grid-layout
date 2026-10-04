@@ -1,0 +1,30 @@
+---
+title: Collisions and compaction
+description: What happens when an item lands on another, how a layout settles after every change, and the rules that change both.
+---
+
+When an item lands on another, the one landed on is **pushed**: down with vertical compaction,
+toward the end with horizontal. A move first tries to put the pushed item above (or before) the one
+that pushed it, when there is room. Statics never move: the moving item goes around them.
+
+After every change the layout **settles**:
+
+| compactor | what it does |
+| --- | --- |
+| `verticalCompactor` (default) | each item rises as far as it can, in reading order |
+| `horizontalCompactor` | each item moves toward the start as far as it can, wrapping to a new row |
+| `noCompactor` | items stay where they are put; one that would overlap is pushed down |
+
+```tsx title="free.tsx"
+import { GridLayout, noCompactor } from "@fragiola/grid-layout-react";
+
+<GridLayout.Root compactor={noCompactor} preventCollision>…</GridLayout.Root>
+```
+
+## Two rules
+
+- `preventCollision` refuses a move or resize into an occupied cell instead of pushing: the item
+  goes back, and a command answers `collision`.
+- `allowOverlap` lets items stack: nothing is pushed and nothing settles.
+
+<Example id="compaction-modes" />
