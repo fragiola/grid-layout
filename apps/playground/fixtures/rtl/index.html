@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Right-to-left grid layout fixture</title>
+        <style>
+            /* the fixture's own few lines: hit areas for the handles, and a page to read */
+            /* room around the grid: a pointer can leave the root and stay on the page */
+            body { margin: 0; padding: 120px 160px 40px; font: 13px/1.2 system-ui, sans-serif; }
+            [data-grid-layout-part="root"] { width: 960px; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="resize-handle"] { position: absolute; width: 12px; height: 12px; background: #333; }
+            [data-side="top"] { inset-block-start: 0; inset-inline-start: calc(50% - 6px); }
+            [data-side="bottom"] { inset-block-end: 0; inset-inline-start: calc(50% - 6px); }
+            [data-side="start"] { inset-inline-start: 0; inset-block-start: calc(50% - 6px); }
+            [data-side="end"] { inset-inline-end: 0; inset-block-start: calc(50% - 6px); }
+            [data-side="top-start"] { inset-block-start: 0; inset-inline-start: 0; }
+            [data-side="top-end"] { inset-block-start: 0; inset-inline-end: 0; }
+            [data-side="bottom-start"] { inset-block-end: 0; inset-inline-start: 0; }
+            [data-side="bottom-end"] { inset-block-end: 0; inset-inline-end: 0; }
+            [data-grid-layout-part="drag-handle"] { width: 16px; height: 16px; background: #06c; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountGridFixture } from "../../src/fixture/grid-fixture.tsx";
+            mountGridFixture("rtl");
+        </script>
+    </body>
+</html>

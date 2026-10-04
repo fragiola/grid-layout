@@ -222,14 +222,39 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
   first, then the consumer's.
 - **`className` and `style` accept a value or a `(state) => value` function.** Consumer style is
   merged *under* the structural style: structural keys always win.
-- **Structural inline style only**: what behaviour needs (position, size, transform, the stacking
-  of the active item, `touch-action` on handles). Nothing cosmetic.
+- **Structural inline style only** (a component test holds the list): `position`, `top`, `left`,
+  `width`, `height`, `transform` and `box-sizing` place a box; `z-index` keeps a held item above
+  the others; `touch-action: none` makes a handle's touch a drag; `pointer-events: none` keeps the
+  placeholder out of the pointer's way. Nothing cosmetic: transitions, cursors, colours, shadows
+  and the handles' look are the app's.
 - **State only through `data-*` and ARIA**, present or absent (never `"false"`). Every part
   carries `data-grid-layout-part`, every item `data-item-id`; e2e selectors use them, never class
   names.
 - **No text and no names.** Primitives render only their children and set no `aria-label` or role
   of their own.
-- **The developer owns the recursion**: a children function over the model's items.
+- **The developer owns the recursion**: `Items` is a children function over the model's items,
+  keyed by id.
+- **The parts** (`GridLayout.*`, each over its hook):
+  - `Root` (`useGridLayout`, `useGridLayoutView`): a `div` positioned `relative`, as tall as the
+    layout with `autoSize`; `data-dragging`, `data-resizing`, `data-grabbed`. Its `dir` prop is
+    the engine's direction and the element's `dir`.
+  - `Item` (`useItem`): placed by a `transform`; `data-item-id`, `data-dragging`,
+    `data-resizing`, `data-grabbed`, `data-static`, `data-draggable`, `data-resizable`. It is the
+    tab stop (`tabIndex` 0), or `-1` once it has a drag handle.
+  - `DragHandle` (`useDragHandle`): the only place its item drags from once there is one, and the
+    item's tab stop; `data-dragging`, `data-grabbed`, `data-draggable`.
+  - `ResizeHandle` (`useResizeHandle`): a `side` (`top`, `bottom`, `start`, `end` or a corner);
+    `data-side`, `data-resizing`; renders nothing while its item cannot be resized. Where it
+    sits and how it looks are the app's (the fixtures use logical insets).
+  - `Placeholder` (`usePlaceholder`): only during a gesture, at the box the held item would land
+    in; `data-kind` (`move`, `resize`, `keyboard`).
+- **Presses and keys go to the engine after the consumer.** `Root` calls the engine's
+  `pointerdown` and `keydown` after the consumer's `onPointerDown`/`onKeyDown` (on `Root` or its
+  `render` element): `preventDefault` vetoes a gesture or replaces a key. During a pointer gesture,
+  Escape reaches the engine from the document after the app's own handlers.
+- **The held item's geometry is the engine's during a pointer gesture**: React keeps the item's
+  props at its starting box, the engine writes its `transform` (and size) itself, and puts the box
+  back when the gesture ends.
 
 ## Site
 
