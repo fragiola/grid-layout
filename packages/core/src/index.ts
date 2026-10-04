@@ -48,5 +48,38 @@ export {
     type ResizeSide,
 } from "./layout/types";
 
+export {
+    activeLayout,
+    COMMANDS,
+    createGridLayoutModel,
+    fail,
+    rulesOf,
+    veto,
+} from "./model/model";
+export {
+    type CommandContext,
+    type CommandError,
+    type CommandErrorCode,
+    type CommandEvent,
+    type CommandFailure,
+    type CommandListener,
+    type CommandMap,
+    type CommandName,
+    type CommandResult,
+    DEFAULT_BREAKPOINT,
+    type GridLayoutModel,
+    type GridLayoutModelOptions,
+    type GridLayoutState,
+    type GridSettings,
+    type ItemSettings,
+    type Middleware,
+    type PayloadOf,
+    type QueryKey,
+    type QueryMap,
+    type QuestionKey,
+    type QuestionMap,
+    type ResultOf,
+} from "./model/types";
+
 /** The package version, until the first release replaces this placeholder export. */
 export const VERSION = "0.0.0";
