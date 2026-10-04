@@ -139,6 +139,48 @@ export function resizeItem(
     return settle(layout, work, rules);
 }
 
+/**
+ * The item `id` given the box `rect` at once (kept within its limits and the grid, at that place),
+ * pushing what it lands on or grows into, then settled. A move to the same box and size is a
+ * move; a new size in the same place grows from the bottom-end, as a resize from there does.
+ */
+export function placeItem(
+    layout: Layout,
+    id: string,
+    rect: { x: number; y: number; w: number; h: number },
+    rules: LayoutRules,
+): Layout {
+    const work = toWorking(layout);
+    const item = work.find((entry) => entry.id === id);
+    if (item === undefined || item.static) return layout;
+    const maxRows = rules.maxRows ?? Number.POSITIVE_INFINITY;
+    const { source } = item;
+    const x = Math.max(0, Math.min(rect.x, rules.cols - 1));
+    const y = Math.max(0, rect.y);
+    const w = Math.max(
+        Math.min(rect.w, source.maxW ?? rules.cols, rules.cols - x),
+        Math.min(source.minW ?? 1, rules.cols - x),
+        1,
+    );
+    const h = Math.max(
+        Math.min(rect.h, source.maxH ?? maxRows, maxRows - y),
+        Math.min(source.minH ?? 1, maxRows - y),
+        1,
+    );
+    if (x === item.x && y === item.y && w === item.w && h === item.h)
+        return layout;
+    const options = moveOptions(rules);
+    if (options.preventCollision && !options.allowOverlap) {
+        const target = { id, x, y, w, h };
+        if (layout.some((other) => collides(other, target))) return layout;
+    }
+    item.w = w;
+    item.h = h;
+    if (!moveWorking(work, item, x, y, true, options))
+        pushAside(work, item, options);
+    return settle(layout, work, rules);
+}
+
 /** The first cell, in reading order, where an item of `w` × `h` overlaps nothing. */
 export function firstFreeCell(
     layout: Layout,

@@ -5,7 +5,13 @@
 
 import { bottom as bottomOf, collides, collisions } from "../layout/collision";
 import { verticalCompactor } from "../layout/compact";
-import { addItem, moveItem, removeItem, resizeItem } from "../layout/edit";
+import {
+    addItem,
+    moveItem,
+    placeItem,
+    removeItem,
+    resizeItem,
+} from "../layout/edit";
 import { layoutProblems, normaliseLayout } from "../layout/normalise";
 import { resizeRect } from "../layout/resize";
 import {
@@ -293,6 +299,33 @@ const handlers: Handlers = {
         return done(withLayout(state, next), { item: itemIn(next, item.id) });
     },
 
+    "item.place": (state, { itemId, x, y, w, h }) => {
+        need(
+            [x, y, w, h].every(isInteger) && w >= 1 && h >= 1,
+            "x and y must be integers, w and h integers of at least 1",
+        );
+        const item = found(state, itemId);
+        if (isFailure(item)) return item;
+        if (item.static) return fail("refused", `item "${item.id}" is static`);
+        need(
+            x >= 0 && y >= 0 && x + w <= state.cols && y + h <= state.maxRows,
+            `the box ${x},${y} ${w}×${h} puts item "${item.id}" outside the grid`,
+        );
+        const layout = activeLayout(state);
+        if (state.preventCollision && !state.allowOverlap) {
+            const target = { id: item.id, x, y, w, h };
+            const hit = layout.find((other) => collides(other, target));
+            if (hit) {
+                return fail(
+                    "collision",
+                    `item "${item.id}" would land on "${hit.id}"`,
+                );
+            }
+        }
+        const next = placeItem(layout, item.id, { x, y, w, h }, rulesOf(state));
+        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+    },
+
     "item.configure": (state, { itemId, settings }) => {
         need(
             typeof settings === "object" && settings !== null,
@@ -381,6 +414,7 @@ export const COMMANDS = [
     "item.remove",
     "item.move",
     "item.resize",
+    "item.place",
     "item.configure",
     "grid.configure",
 ] as const satisfies readonly CommandName[];

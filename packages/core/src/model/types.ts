@@ -106,6 +106,20 @@ export interface CommandMap {
         };
         result: { readonly item: LayoutItem };
     };
+    /**
+     * moves and resizes an item at once (a keyboard gesture that did both): the move, then the
+     * resize from its bottom-end, as one change. Returns the item, settled
+     */
+    "item.place": {
+        payload: {
+            readonly itemId: string;
+            readonly x: number;
+            readonly y: number;
+            readonly w: number;
+            readonly h: number;
+        };
+        result: { readonly item: LayoutItem };
+    };
     /** changes an item's limits and flags; its size comes back within the new limits */
     "item.configure": {
         payload: { readonly itemId: string; readonly settings: ItemSettings };

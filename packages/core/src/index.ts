@@ -1,6 +1,41 @@
 // @fragiola/grid-layout: the framework-free core of the headless grid layout.
 
 export {
+    DRAG_EXEMPT,
+    ITEM_ATTRIBUTE,
+    NO_DRAG_ATTRIBUTE,
+    PART_ATTRIBUTE,
+} from "./engine/dom";
+export { createGridLayoutEngine } from "./engine/engine";
+export {
+    type DragHandleState,
+    dragHandlePart,
+    type ItemState,
+    itemPart,
+    type Part,
+    type PlaceholderState,
+    placeholderPart,
+    type ResizeHandleState,
+    type RootState,
+    resizeHandlePart,
+    rootPart,
+    type StructuralStyle,
+} from "./engine/parts";
+export type {
+    Direction,
+    EngineActionMap,
+    EngineQueryMap,
+    EngineQuestionMap,
+    GestureEvent,
+    GestureListener,
+    GestureSource,
+    GestureView,
+    GridLayoutEngine,
+    GridLayoutEngineAdapter,
+    GridLayoutEngineOptions,
+    GridLayoutView,
+} from "./engine/types";
+export {
     bottom,
     collides,
     collisions,
@@ -18,6 +53,7 @@ export {
     firstFreeCell,
     moveItem,
     type NewLayoutItem,
+    placeItem,
     removeItem,
     resizeItem,
 } from "./layout/edit";
@@ -47,7 +83,6 @@ export {
     RESIZE_SIDES,
     type ResizeSide,
 } from "./layout/types";
-
 export {
     activeLayout,
     COMMANDS,
