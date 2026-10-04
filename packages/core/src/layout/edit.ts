@@ -127,15 +127,13 @@ export function resizeItem(
         const target = { id, ...rect };
         if (layout.some((other) => collides(other, target))) return layout;
     }
+    // The resized item keeps the box its handle gives it: what it now covers is pushed past its
+    // far edge, never swapped with it (a move's swap would make the resized item jump).
+    item.x = rect.x;
+    item.y = rect.y;
     item.w = rect.w;
     item.h = rect.h;
-    // A resize from the top or the start moves the item: it pushes what it now covers, as a
-    // move does. One from the bottom or the end keeps its place and pushes what it grows into
-    // past its new edge (the compaction alone would let a taller neighbour that starts higher
-    // push the resized item down instead).
-    if (!moveWorking(work, item, rect.x, rect.y, true, options)) {
-        pushAside(work, item, options);
-    }
+    pushAside(work, item, options);
     return settle(layout, work, rules);
 }
 

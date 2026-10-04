@@ -576,6 +576,8 @@ export function createGridLayoutEngine(
         if (!current || !root) return;
         const doc = root.ownerDocument;
         const element = down.element;
+        // a selection made before would follow the pointer as a native drag
+        doc.getSelection()?.removeAllRanges();
         try {
             element.setPointerCapture(down.pointerId);
         } catch {
@@ -617,8 +619,9 @@ export function createGridLayoutEngine(
                     cancel(key);
                 }
             }),
-            // no text selection while an item is dragged
+            // no text selection while an item is dragged, and no native drag of one
             listen(doc, "selectstart", (select) => select.preventDefault()),
+            listen(doc, "dragstart", (native) => native.preventDefault()),
             () => {
                 try {
                     if (element.hasPointerCapture(down.pointerId)) {
@@ -723,6 +726,9 @@ export function createGridLayoutEngine(
         };
         press = down;
         down.cleanup.push(
+            // the browser's own drag (a selection, an image) would cancel the pointer: the press
+            // is the grid's until it ends or turns out to be a click
+            listen(doc, "dragstart", (native) => native.preventDefault()),
             listen(doc, "pointermove", (move) => {
                 if (move.pointerId !== down.pointerId) return;
                 if (move.buttons === 0) {
