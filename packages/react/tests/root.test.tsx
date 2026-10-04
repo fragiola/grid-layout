@@ -318,6 +318,20 @@ describe("GridLayout.Root", () => {
         expect(onChange).toHaveBeenCalledTimes(1);
     });
 
+    it("tells a new prop that has to be corrected, even when the grid already shows it", () => {
+        const onLayoutChange = vi.fn();
+        const messy = (): Layout => [{ id: "a", x: 0, y: 5, w: 2, h: 2 }];
+        const { rerender } = render(
+            <Grid layout={messy()} onLayoutChange={onLayoutChange} />,
+        );
+        expect(onLayoutChange).toHaveBeenCalledTimes(1);
+        rerender(<Grid layout={messy()} onLayoutChange={onLayoutChange} />);
+        expect(onLayoutChange).toHaveBeenCalledTimes(2);
+        expect(onLayoutChange).toHaveBeenLastCalledWith([
+            { id: "a", x: 0, y: 0, w: 2, h: 2 },
+        ]);
+    });
+
     it("goes back to a rule's default when its prop is removed", () => {
         let api: ReturnType<typeof useGridLayout> | undefined;
         function Grab() {

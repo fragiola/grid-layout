@@ -27,10 +27,11 @@ function Grid(props: { width?: number }) {
 }
 
 describe("server rendering", () => {
-    it("renders without a document, items unplaced until measured", () => {
+    it("renders the root without a document, and the items once a width is known", () => {
         const html = renderToString(<Grid />);
-        expect(html).toContain('data-grid-layout-part="item"');
-        expect(html).not.toContain("translate(");
+        expect(html).toContain('data-grid-layout-part="root"');
+        // items mount already placed, on the client once the root is measured
+        expect(html).not.toContain('data-grid-layout-part="item"');
     });
 
     it("places items when given a width", () => {

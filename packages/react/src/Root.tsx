@@ -257,6 +257,11 @@ export function Root(props: RootProps) {
         const settled = normaliseLayout(layout, model.get("rules"));
         if (settled.ok && sameLayout(settled.layout, current)) {
             checked.current = { prop: layout, model: current };
+            // a new prop the grid shows corrected is told, even when the grid did not change
+            // (on mount, the mount check tells it)
+            if (last && !sameLayout(settled.layout, layout)) {
+                latest.current.onLayoutChange?.(current);
+            }
             return;
         }
         syncing.current = true;

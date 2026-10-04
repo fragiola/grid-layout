@@ -14,6 +14,7 @@ import { Fragment, type ReactNode } from "react";
 import { ItemContext } from "./context";
 import {
     useDragHandle,
+    useGridLayoutView,
     useItem,
     useItems,
     usePlaceholder,
@@ -28,9 +29,15 @@ export interface ItemsProps {
     children: (item: LayoutItem) => ReactNode;
 }
 
-/** The committed layout's items, in order: `children` renders each one. */
+/**
+ * The committed layout's items, in order: `children` renders each one. Nothing renders until the
+ * root's width is known (or given): an item then mounts already in place, so an app's transition
+ * never animates it in from the corner.
+ */
 export function Items({ children }: ItemsProps) {
+    const view = useGridLayoutView();
     const items = useItems();
+    if (!view.geometry) return null;
     return items.map((item) => (
         <Fragment key={item.id}>{children(item)}</Fragment>
     ));
