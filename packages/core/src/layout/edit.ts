@@ -216,8 +216,16 @@ export function addItem(
             ? firstFreeCell(layout, size, rules.cols)
             : inBounds(rules, size, item.x, item.y);
     if (item.static || rules.allowOverlap) {
-        // a static takes its cell and the others settle around it
-        return compactLayout([...layout, { ...item, ...wanted, w }], rules);
+        // a static takes its cell, below any static already there, and the others settle around
+        // it (as normalisation separates statics)
+        let placed: LayoutItem = { ...item, ...wanted, w };
+        if (item.static && !rules.allowOverlap) {
+            const statics = layout.filter((entry) => entry.static);
+            while (firstCollision(statics, placed) !== undefined) {
+                placed = { ...placed, y: placed.y + 1 };
+            }
+        }
+        return compactLayout([...layout, placed], rules);
     }
     // the new item starts below everything, then moves in like a dropped one
     const work = toWorking([

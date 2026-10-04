@@ -65,6 +65,8 @@ export interface GridLayoutView {
     readonly geometry: GridGeometry | undefined;
     /** the committed layout */
     readonly layout: Layout;
+    /** the committed layout's items, by id */
+    readonly items: ReadonlyMap<string, LayoutItem>;
     /**
      * each item's box, logical (from the inline-start edge): the preview's during a gesture,
      * except the item the gesture holds, which keeps its box from the gesture's start (the engine

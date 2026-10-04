@@ -46,7 +46,7 @@ an implementation detail.
    compactor, `preventCollision`, `allowOverlap`). It stores layouts **per breakpoint** (one
    implicit breakpoint until responsive grids). Every change is a command through a middleware
    chain (`model.run` / `model.use`); reads go through `get`/`is` keys typed by a registry.
-   **A committed layout is always valid**: in bounds, no overlap unless `allowOverlap`, compacted.
+   **A committed layout is always valid**: inside the columns, no overlap unless `allowOverlap`, compacted. `maxRows` bounds what a gesture or a command asks for; pushes and compaction may settle items below it, as in React Grid Layout.
    An **engine** is one grid on screen: measurement, px↔grid geometry (`rowHeight`, `gap`,
    `padding`), container height (`autoSize`), gesture sessions and the preview layout, keyboard,
    focus and direction. `GridLayout.Root` takes declarative props, each controlled (`layout` +

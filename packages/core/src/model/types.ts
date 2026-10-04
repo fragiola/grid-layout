@@ -17,7 +17,10 @@ export const DEFAULT_BREAKPOINT = "default";
 export interface GridLayoutState {
     /** the columns */
     readonly cols: number;
-    /** the rows a gesture may reach (`Infinity`: unbounded) */
+    /**
+     * the rows a gesture or a command may ask for (`Infinity`: unbounded); pushes and compaction
+     * may still settle items below it
+     */
     readonly maxRows: number;
     /** how the layout settles after every change */
     readonly compactor: Compactor;
@@ -70,11 +73,11 @@ export interface CommandMap {
     };
     /**
      * adds an item at its `x`/`y`, pushing what is there, or at the first free cell when it names
-     * none (its id unused). Returns it, as placed
+     * none (its id unused). Returns it, as placed, and the layout, settled
      */
     "item.add": {
         payload: { readonly item: NewLayoutItem };
-        result: { readonly item: LayoutItem };
+        result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** removes an item. Returns its id */
     "item.remove": {
@@ -91,7 +94,7 @@ export interface CommandMap {
             readonly x: number;
             readonly y: number;
         };
-        result: { readonly item: LayoutItem };
+        result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /**
      * resizes an item from `side` (default `bottom-end`), the opposite edge staying put, within
@@ -104,7 +107,7 @@ export interface CommandMap {
             readonly h: number;
             readonly side?: ResizeSide | undefined;
         };
-        result: { readonly item: LayoutItem };
+        result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /**
      * moves and resizes an item at once (a keyboard gesture that did both): the move, then the
@@ -118,12 +121,12 @@ export interface CommandMap {
             readonly w: number;
             readonly h: number;
         };
-        result: { readonly item: LayoutItem };
+        result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** changes an item's limits and flags; its size comes back within the new limits */
     "item.configure": {
         payload: { readonly itemId: string; readonly settings: ItemSettings };
-        result: { readonly item: LayoutItem };
+        result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** changes the grid's rules; every layout is corrected and settled under them */
     "grid.configure": {

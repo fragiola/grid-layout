@@ -181,17 +181,21 @@ export function Root(props: RootProps) {
         return { model: created, engine: bound, given: start };
     });
 
-    engine.adapter.setOptions({
-        rowHeight,
-        gap,
-        padding,
-        autoSize,
-        width,
-        draggable,
-        resizable,
-        bounded,
-        threshold,
-        dir,
+    // the engine's options after each render: setting them may tell a new view, which must not
+    // happen while React renders
+    useLayoutEffect(() => {
+        engine.adapter.setOptions({
+            rowHeight,
+            gap,
+            padding,
+            autoSize,
+            width,
+            draggable,
+            resizable,
+            bounded,
+            threshold,
+            dir,
+        });
     });
 
     const view = useSyncExternalStore(
@@ -254,12 +258,20 @@ export function Root(props: RootProps) {
         const current = model.get("layout");
         const last = checked.current;
         if (last && last.prop === layout && last.model === current) return;
+        // a new prop (not the model changing under the same one, as a rule's change does)
+        const fresh = last !== null && last.prop !== layout;
         const settled = normaliseLayout(layout, model.get("rules"));
-        if (settled.ok && sameLayout(settled.layout, current)) {
+        if (!settled.ok) {
+            // the same error a mount with this layout throws: a layout that cannot be used
+            throw new TypeError(
+                `invalid layout: ${settled.problems.map((problem) => problem.message).join("; ")}`,
+            );
+        }
+        if (sameLayout(settled.layout, current)) {
             checked.current = { prop: layout, model: current };
             // a new prop the grid shows corrected is told, even when the grid did not change
             // (on mount, the mount check tells it)
-            if (last && !sameLayout(settled.layout, layout)) {
+            if (fresh && !sameLayout(settled.layout, layout)) {
                 latest.current.onLayoutChange?.(current);
             }
             return;

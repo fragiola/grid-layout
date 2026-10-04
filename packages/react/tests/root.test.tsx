@@ -332,6 +332,50 @@ describe("GridLayout.Root", () => {
         ]);
     });
 
+    it("tells a controlled layout once when a rule re-settles it", () => {
+        const onLayoutChange = vi.fn();
+        function Parent({ cols }: { cols: number }) {
+            const [layout, setLayout] = useState<Layout>(two);
+            return (
+                <Grid
+                    cols={cols}
+                    layout={layout}
+                    onLayoutChange={(next) => {
+                        onLayoutChange(next);
+                        setLayout(next);
+                    }}
+                />
+            );
+        }
+        const { rerender } = render(<Parent cols={12} />);
+        rerender(<Parent cols={2} />);
+        expect(onLayoutChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("tells nothing when only a rule changes and no item moves", () => {
+        const onLayoutChange = vi.fn();
+        const { rerender } = render(
+            <Grid defaultLayout={two} onLayoutChange={onLayoutChange} />,
+        );
+        rerender(
+            <Grid
+                defaultLayout={two}
+                onLayoutChange={onLayoutChange}
+                preventCollision
+            />,
+        );
+        expect(onLayoutChange).not.toHaveBeenCalled();
+    });
+
+    it("throws the same error for an invalid layout on mount and later", () => {
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const bad = [{ id: "a", x: 0, y: 0, w: 0, h: 1 }] as Layout;
+        expect(() => render(<Grid layout={bad} />)).toThrow(/invalid layout/);
+        const { rerender } = render(<Grid layout={two} />);
+        expect(() => rerender(<Grid layout={bad} />)).toThrow(/invalid layout/);
+        spy.mockRestore();
+    });
+
     it("goes back to a rule's default when its prop is removed", () => {
         let api: ReturnType<typeof useGridLayout> | undefined;
         function Grab() {

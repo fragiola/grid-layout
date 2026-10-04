@@ -8,6 +8,7 @@
 
 import { bottom, firstCollision } from "./collision";
 import { compactLayout } from "./edit";
+import { fitSize } from "./limits";
 import type { Layout, LayoutItem, LayoutRules } from "./types";
 
 /** Why a layout cannot be used. */
@@ -73,14 +74,6 @@ export function layoutProblems(layout: unknown): LayoutProblem[] {
     return problems;
 }
 
-function within(
-    size: number,
-    min: number | undefined,
-    max: number | undefined,
-): number {
-    return Math.max(Math.min(size, max ?? Number.POSITIVE_INFINITY), min ?? 1);
-}
-
 /**
  * `layout` checked, then corrected and settled: sizes within each item's limits and the grid's
  * columns, every item inside the columns, `y: Infinity` below the items before it, overlapping
@@ -97,9 +90,8 @@ export function normaliseLayout(
     const placed: LayoutItem[] = [];
     let changed = false;
     const corrected = layout.map((item) => {
-        const w = Math.min(within(item.w, item.minW, item.maxW), rules.cols);
-        const h = within(item.h, item.minH, item.maxH);
-        let x = Math.max(0, Math.min(item.x, rules.cols - w));
+        const { w, h } = fitSize(item, rules.cols);
+        const x = Math.max(0, Math.min(item.x, rules.cols - w));
         let y =
             item.y === Number.POSITIVE_INFINITY
                 ? bottom(placed)
@@ -113,7 +105,6 @@ export function normaliseLayout(
                 next = { ...next, y };
             }
         }
-        x = next.x;
         const same =
             x === item.x && y === item.y && w === item.w && h === item.h;
         if (!same) changed = true;

@@ -12,6 +12,7 @@ import {
     removeItem,
     resizeItem,
 } from "../layout/edit";
+import { fitSize } from "../layout/limits";
 import { layoutProblems, normaliseLayout } from "../layout/normalise";
 import { resizeRect } from "../layout/resize";
 import {
@@ -216,22 +217,15 @@ const handlers: Handlers = {
         ]);
         need(problems.length === 0, problems.map((p) => p.message).join("; "));
         // the size within the item's own limits and the columns
-        const w = Math.min(
-            Math.max(
-                Math.min(item.w, item.maxW ?? Number.POSITIVE_INFINITY),
-                item.minW ?? 1,
-            ),
-            state.cols,
-        );
-        const h = Math.max(
-            Math.min(item.h, item.maxH ?? Number.POSITIVE_INFINITY),
-            item.minH ?? 1,
-        );
+        const { w, h } = fitSize(item, state.cols);
         // `y: Infinity` means below everything, as in a layout
         const y =
             item.y === Number.POSITIVE_INFINITY ? bottomOf(layout) : item.y;
         const next = addItem(layout, { ...item, y, w, h }, rulesOf(state));
-        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+        return done(withLayout(state, next), {
+            item: itemIn(next, item.id),
+            layout: next,
+        });
     },
 
     "item.remove": (state, { itemId }) => {
@@ -265,7 +259,10 @@ const handlers: Handlers = {
             }
         }
         const next = moveItem(layout, item.id, x, y, rulesOf(state));
-        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+        return done(withLayout(state, next), {
+            item: itemIn(next, item.id),
+            layout: next,
+        });
     },
 
     "item.resize": (state, { itemId, w, h, side = "bottom-end" }) => {
@@ -296,7 +293,10 @@ const handlers: Handlers = {
             side,
             rulesOf(state),
         );
-        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+        return done(withLayout(state, next), {
+            item: itemIn(next, item.id),
+            layout: next,
+        });
     },
 
     "item.place": (state, { itemId, x, y, w, h }) => {
@@ -323,7 +323,10 @@ const handlers: Handlers = {
             }
         }
         const next = placeItem(layout, item.id, { x, y, w, h }, rulesOf(state));
-        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+        return done(withLayout(state, next), {
+            item: itemIn(next, item.id),
+            layout: next,
+        });
     },
 
     "item.configure": (state, { itemId, settings }) => {
@@ -357,14 +360,17 @@ const handlers: Handlers = {
                 ([key, value]) => item[key as keyof LayoutItem] === value,
             )
         ) {
-            return done(state, { item });
+            return done(state, { item, layout: activeLayout(state) });
         }
         const layout = activeLayout(state);
         const changed = layout.map((entry) =>
             entry === item ? { ...entry, ...picked } : entry,
         );
         const next = normalised(changed, rulesOf(state));
-        return done(withLayout(state, next), { item: itemIn(next, item.id) });
+        return done(withLayout(state, next), {
+            item: itemIn(next, item.id),
+            layout: next,
+        });
     },
 
     "grid.configure": (state, { settings }) => {
@@ -380,30 +386,27 @@ const handlers: Handlers = {
             allowOverlap: allowOverlap ?? state.allowOverlap,
         };
         const rules = rulesOf(configured);
-        const layouts = Object.fromEntries(
-            Object.entries(state.layouts).map(([breakpoint, layout]) => [
-                breakpoint,
-                normalised(layout, rules),
-            ]),
+        const normalisedLayouts = Object.entries(state.layouts).map(
+            ([breakpoint, layout]) =>
+                [breakpoint, normalised(layout, rules)] as const,
         );
+        // the same layouts object when no layout changed: listeners can tell a rule's change
+        // from a layout's (`before.layouts !== after.layouts`)
+        const layouts = normalisedLayouts.every(
+            ([breakpoint, layout]) => layout === state.layouts[breakpoint],
+        )
+            ? state.layouts
+            : Object.freeze(Object.fromEntries(normalisedLayouts));
         const same =
             configured.cols === state.cols &&
             configured.maxRows === state.maxRows &&
             configured.compactor === state.compactor &&
             configured.preventCollision === state.preventCollision &&
             configured.allowOverlap === state.allowOverlap &&
-            Object.entries(layouts).every(
-                ([key, layout]) => layout === state.layouts[key],
-            );
-        return done(
-            same
-                ? state
-                : Object.freeze({
-                      ...configured,
-                      layouts: Object.freeze(layouts),
-                  }),
-            { rules },
-        );
+            layouts === state.layouts;
+        return done(same ? state : Object.freeze({ ...configured, layouts }), {
+            rules,
+        });
     },
 };
 

@@ -438,16 +438,16 @@ describe("the keyboard", () => {
         a.focus();
         expect(key(a, " ").defaultPrevented).toBe(true);
         expect(grid.view().gesture?.kind).toBe("keyboard");
-        key(a, "ArrowDown");
-        key(a, "ArrowRight", { shiftKey: true });
+        key(a, "ArrowRight");
+        key(a, "ArrowDown", { shiftKey: true });
         // the held item itself shows where it would land
         expect(grid.view().rects.a).toEqual(grid.view().gesture?.placeholder);
         key(a, "Enter");
         expect(committed).toEqual(["item.place"]);
         expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
-            x: 0,
-            w: 3,
-            h: 2,
+            x: 1,
+            w: 2,
+            h: 3,
         });
         expect(grid.events.map((event) => event.type)).toEqual([
             "grab",
@@ -455,6 +455,18 @@ describe("the keyboard", () => {
             "resize",
             "drop",
         ]);
+    });
+
+    it("follows where the item lands: a step compaction undoes is neither shown nor told", () => {
+        const grid = setup({ layout: [item("a", 0, 0, 2, 2)] });
+        const a = grid.item("a");
+        key(a, " ");
+        for (let i = 0; i < 5; i++) key(a, "ArrowDown");
+        // vertical compaction keeps a lone item on the first row
+        expect(grid.events.map((event) => event.type)).toEqual(["grab"]);
+        key(a, "ArrowRight");
+        expect(grid.view().gesture?.preview[0]).toMatchObject({ x: 1, y: 0 });
+        key(a, "Escape");
     });
 
     it("moves with a single command when it only moves", () => {
@@ -625,6 +637,39 @@ describe("the review's cases", () => {
         // 300px tall: the item (110px) stops at 190px, row 3
         expect(grid.item("a").style.transform).toBe("translate(10px, 190px)");
         press.release(at(0, 0)[0], 5000);
+    });
+});
+
+describe("the epic review's engine cases", () => {
+    it("keeps a gesture going when a rule changes but not the layout", () => {
+        const grid = setup(two());
+        const press = pointer(grid.item("a"), ...at(0, 0));
+        press.move(...at(2, 1));
+        grid.model.run("grid.configure", {
+            settings: { preventCollision: false, maxRows: 100 },
+        });
+        expect(grid.view().gesture?.itemId).toBe("a");
+        press.release(...at(2, 1));
+        expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
+            x: 2,
+        });
+    });
+
+    it("previews a middleware's rewrite, exactly as the drop commits it", () => {
+        const grid = setup(two());
+        grid.model.use((ctx, next) => {
+            if (ctx.command === "item.move")
+                ctx.payload = { ...ctx.payload, x: 6 };
+            return next();
+        });
+        const press = pointer(grid.item("a"), ...at(0, 0));
+        press.move(...at(2, 0));
+        const previewed = grid
+            .view()
+            .gesture?.preview.find((entry) => entry.id === "a");
+        expect(previewed).toMatchObject({ x: 6 });
+        press.release(...at(2, 0));
+        expect(grid.model.get("item-by", { itemId: "a" })).toEqual(previewed);
     });
 });
 

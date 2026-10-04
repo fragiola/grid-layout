@@ -27,7 +27,7 @@ Measured on the development machine (`pnpm bench`, `pnpm size`); informative, no
 | one move with push, then settle, 1,000 items | 28 ms mean |
 | React commits during a drag inside one cell | 0 |
 | React commits per preview change | 1 |
-| unit and component tests | 290 (core 178, React 28, the rest the apps, examples and site) |
+| unit and component tests | 299 (core 184, React 31, the rest the apps, examples and site) |
 | e2e | 80 in the playground (Chromium, Firefox, touch), 81 in the examples app, 100 in all themes |
 
 The standard compactors are O(n²): fine for dashboards (tens of items), slow past a few hundred
@@ -53,11 +53,14 @@ items per preview. The fast compactors of Epic #18 address large layouts.
    Layout mutates layouts in place in `moveElement`, `correctBounds` and the compactors.
 7. **`onLayoutChange` fires once per committed change**, never during a gesture, and on mount only
    when the layout was corrected; React Grid Layout can fire it twice after a drag.
-8. **An empty layout's height is the padding alone** (React Grid Layout gives `2 × padding − gap`).
-9. **No child-key synchronisation** (`data-grid`), no `WidthProvider`, no stylesheet, no
+8. **`maxRows` is the same as React Grid Layout's**: it bounds what a gesture or a command asks
+   for, while pushes and compaction may settle items below it. A hard bound would have to refuse
+   pushes; it is left for the constraints Epic (#18).
+9. **An empty layout's height is the padding alone** (React Grid Layout gives `2 × padding − gap`).
+10. **No child-key synchronisation** (`data-grid`), no `WidthProvider`, no stylesheet, no
    `react-draggable` or `react-resizable`, no legacy API: the model is the source of truth, the root
    measures itself, and the look is the app's.
-10. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
+11. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
     logical sides and right-to-left, middleware that can refuse a gesture's landing (the preview
     shows the item going back), and `item.place` for a move and a resize at once.
 

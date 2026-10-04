@@ -88,7 +88,7 @@ describe("the commands", () => {
     it("item.add places an item, at its cell or the first free one", () => {
         const model = createGridLayoutModel({ cols: 4, layout: dashboard() });
         const free = model.run("item.add", { item: { id: "n", w: 2, h: 1 } });
-        expect(free).toEqual({
+        expect(free).toMatchObject({
             ok: true,
             value: { item: { id: "n", x: 2, y: 1, w: 2, h: 1 } },
         });
@@ -212,7 +212,7 @@ describe("the commands", () => {
                 h: 2,
                 side: "start",
             }),
-        ).toEqual({
+        ).toMatchObject({
             ok: true,
             value: { item: item("a", 0, 0, 4, 2, { minW: 1, maxH: 3 }) },
         });
@@ -384,6 +384,41 @@ describe("the review's cases", () => {
         expect(() => createGridLayoutModel({ compactor: {} as never })).toThrow(
             /compactor/,
         );
+    });
+});
+
+describe("the epic review's cases", () => {
+    it("item.add moves a static off a static already there", () => {
+        const model = createGridLayoutModel({
+            cols: 8,
+            layout: [item("s", 0, 0, 4, 2, { static: true })],
+        });
+        model.run("item.add", {
+            item: { id: "t", x: 2, y: 0, w: 4, h: 2, static: true },
+        });
+        expect(overlaps(model.get("layout"))).toBe(false);
+        expect(model.get("item-by", { itemId: "t" })).toMatchObject({
+            x: 2,
+            y: 2,
+        });
+    });
+
+    it("grid.configure keeps the layouts when no layout changed", () => {
+        const model = createGridLayoutModel({ cols: 4, layout: dashboard() });
+        const events = listen(model);
+        model.run("grid.configure", { settings: { preventCollision: true } });
+        expect(events).toHaveLength(1);
+        expect(events[0]?.after.layouts).toBe(events[0]?.before.layouts);
+    });
+
+    it("item commands return the settled layout with the item", () => {
+        const model = createGridLayoutModel({ cols: 4, layout: dashboard() });
+        const result = model.check("item.move", { itemId: "b", x: 0, y: 0 });
+        expect(
+            result.ok &&
+                result.value.layout.find((entry) => entry.id === "a")?.y,
+        ).toBe(1);
+        expect(model.get("item-by", { itemId: "a" })?.y).toBe(0);
     });
 });
 

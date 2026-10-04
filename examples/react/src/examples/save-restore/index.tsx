@@ -1,6 +1,10 @@
 "use client";
 
-import { GridLayout, type Layout } from "@fragiola/grid-layout-react";
+import {
+    GridLayout,
+    type Layout,
+    layoutProblems,
+} from "@fragiola/grid-layout-react";
 import { useState } from "react";
 import { Clickable } from "#/components/atoms/clickable";
 import { dashboard } from "../_kit/layouts";
@@ -10,12 +14,18 @@ import * as styles from "./styles";
 
 const KEY = "grid-layout:save-restore";
 
+/** The saved layout, if there is one the grid can use: storage holds whatever was written. */
+function saved(): Layout | undefined {
+    const layout = load<Layout>(KEY);
+    return layout && layoutProblems(layout).length === 0 ? layout : undefined;
+}
+
 // Persistence is the app's (D14): every committed change is saved, the saved layout is where the
 // grid starts, and Reset forgets it and starts the grid again from the default.
 export default function SaveRestore() {
     const [run, setRun] = useState(0);
     const [status, setStatus] = useState(() =>
-        load<Layout>(KEY) ? "Restored the saved layout" : "The default layout",
+        saved() ? "Restored the saved layout" : "The default layout",
     );
     const reset = () => {
         forget(KEY);
@@ -35,7 +45,7 @@ export default function SaveRestore() {
             <GridLayout.Root
                 // a new grid on reset: `defaultLayout` is read once, when a grid starts
                 key={run}
-                defaultLayout={load<Layout>(KEY) ?? dashboard()}
+                defaultLayout={saved() ?? dashboard()}
                 onLayoutChange={(layout) =>
                     setStatus(
                         save(KEY, layout)

@@ -117,7 +117,7 @@ export function itemPart(
     view: GridLayoutView,
     itemId: string,
 ): Part<ItemState> & { readonly tabIndex: number } {
-    const item = view.layout.find((entry) => entry.id === itemId);
+    const item = view.items.get(itemId);
     const gesture = view.gesture?.itemId === itemId ? view.gesture : undefined;
     const isStatic = item?.static === true;
     const state: ItemState = {

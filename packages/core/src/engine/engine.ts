@@ -6,7 +6,6 @@
 // through the root's document and window (D13).
 
 import { bottom } from "../layout/collision";
-import { placeItem, resizeItem } from "../layout/edit";
 import {
     cellAt,
     columnWidth,
@@ -164,10 +163,11 @@ export function createGridLayoutEngine(
     let handled: ReadonlySet<string> = new Set();
     const viewListeners = new Set<() => void>();
     const gestureListeners = new Set<GestureListener>();
-    const unsubscribeModel = model.subscribe(() => {
+    const unsubscribeModel = model.subscribe((event) => {
         if (committing) return;
-        if (session) {
-            // the layout changed under a gesture (the app ran a command): it ends, unapplied
+        // the layout changed under a gesture (the app ran a command): it ends, unapplied; a rule
+        // that changed nothing in the layout leaves it going
+        if (session && event.before.layouts !== event.after.layouts) {
             cancel(undefined);
         } else {
             update();
@@ -202,6 +202,7 @@ export function createGridLayoutEngine(
             }
         }
         return {
+            items: itemsOf(layout),
             width: geometry?.width ?? 0,
             height:
                 geometry && settings.autoSize
@@ -216,6 +217,20 @@ export function createGridLayoutEngine(
             draggable: settings.draggable,
             resizable: settings.resizable,
         };
+    }
+
+    /** The committed items by id, built once per layout. */
+    let indexed:
+        | { layout: Layout; items: ReadonlyMap<string, LayoutItem> }
+        | undefined;
+    function itemsOf(layout: Layout): ReadonlyMap<string, LayoutItem> {
+        if (indexed?.layout !== layout) {
+            indexed = {
+                layout,
+                items: new Map(layout.map((item) => [item.id, item])),
+            };
+        }
+        return indexed.items;
     }
 
     function sameView(a: GridLayoutView, b: GridLayoutView): boolean {
@@ -340,53 +355,50 @@ export function createGridLayoutEngine(
         return undefined;
     }
 
-    /** Whether the model would take the gesture ending at `target` (its middleware included). */
-    function allowed(current: Session, target: GridRect): boolean {
+    /**
+     * The layout if `current` ended at `target`, by the model's own dry run (its middleware
+     * included): the preview is exactly what the drop commits. A landing the model refuses
+     * previews the start, the item going back where it was.
+     */
+    function previewFor(
+        current: Session,
+        target: GridRect,
+    ): { layout: Layout; refused: boolean } {
         const call = commandFor(current, target);
-        if (!call) return true;
-        return model.can(call.command, call.payload as never);
+        if (!call) return { layout: current.start, refused: false };
+        const result = model.check(call.command, call.payload as never);
+        if (!result.ok) return { layout: current.start, refused: true };
+        return {
+            layout: (result.value as { readonly layout: Layout }).layout,
+            refused: false,
+        };
     }
 
-    /** The layout if `current` ended at `target`: computed from where the gesture started. */
-    function previewFor(current: Session, target: GridRect): Layout {
-        const rules = rulesOf(model.state);
-        const { start, itemId } = current;
-        // the same layout functions the commands run, so the preview is what gets committed
-        if (current.kind === "resize") {
-            const size = { w: target.w, h: target.h };
-            return resizeItem(
-                start,
-                itemId,
-                size,
-                current.side ?? "bottom-end",
-                rules,
-            );
-        }
-        return placeItem(start, itemId, target, rules);
+    /** Where the held item lands in `layout`. */
+    function landedIn(current: Session, layout: Layout): LayoutItem {
+        return (
+            layout.find((item) => item.id === current.itemId) ?? current.before
+        );
     }
 
-    /** Moves the session's target to `target`, refreshing the preview when it lands elsewhere. */
+    /** Shows `preview`: a new view only when it is a new layout. */
+    function show(current: Session, preview: Layout): void {
+        const geometry = geometryOf();
+        if (!geometry || preview === current.preview) return;
+        current.preview = preview;
+        current.view = {
+            ...current.view,
+            preview,
+            placeholder: itemPixels(geometry, landedIn(current, preview)),
+        };
+        update();
+    }
+
+    /** Moves a pointer session's target to `target`; says whether it moved. */
     function retarget(current: Session, target: GridRect): boolean {
         if (sameRect(target, current.target)) return false;
-        const geometry = geometryOf();
-        if (!geometry) return false;
         current.target = target;
-        // a refused landing shows the item going back where it was
-        const preview = allowed(current, target)
-            ? previewFor(current, target)
-            : current.start;
-        if (preview !== current.preview) {
-            current.preview = preview;
-            const landed =
-                preview.find((item) => item.id === current.itemId) ??
-                current.before;
-            current.view = {
-                ...current.view,
-                preview,
-                placeholder: itemPixels(geometry, landed),
-            };
-            update();
-        }
+        show(current, previewFor(current, target).layout);
         return true;
     }
 
@@ -856,8 +868,15 @@ export function createGridLayoutEngine(
             };
         }
         // a step the model would refuse (a middleware, a collision) is not taken
-        if (!allowed(current, next)) return;
-        if (retarget(current, next)) {
+        const outcome = previewFor(current, next);
+        if (outcome.refused) return;
+        const previous = landedIn(current, current.preview);
+        const landed = landedIn(current, outcome.layout);
+        // the target is where the item landed (compaction may lift it), so the next step starts
+        // from what is shown, and a step that lands nowhere new is not told
+        current.target = { x: landed.x, y: landed.y, w: landed.w, h: landed.h };
+        show(current, outcome.layout);
+        if (!sameRect(landed, previous)) {
             emit(
                 event.shiftKey ? "resize" : "move",
                 current,

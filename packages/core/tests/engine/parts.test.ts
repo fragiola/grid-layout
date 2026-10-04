@@ -28,6 +28,10 @@ function view(over: Partial<GridLayoutView> = {}): GridLayoutView {
             padding: [10, 10],
         },
         layout: [a, s],
+        items: new Map([
+            ["a", a],
+            ["s", s],
+        ]),
         rects: {
             a: { left: 10, top: 10, width: 185, height: 50 },
             s: { left: 205, top: 10, width: 87, height: 50 },
