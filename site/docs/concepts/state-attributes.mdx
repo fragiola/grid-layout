@@ -1,0 +1,39 @@
+---
+title: State attributes
+description: Every state a part has is a data attribute, present or absent, so any styling solution can read it.
+---
+
+A part's state is on its element as `data-*` attributes. A boolean attribute is present (empty) or
+absent, never `"false"`.
+
+## Parts
+
+Every part carries `data-grid-layout-part`: `root`, `item`, `drag-handle`, `resize-handle` or
+`placeholder`. Items carry `data-item-id`. Tests select by them, never by class names.
+
+## States
+
+| attribute | on | when |
+| --- | --- | --- |
+| `data-dragging` | root, item, drag handle | a pointer is moving the item |
+| `data-resizing` | root, item, resize handle | a pointer is resizing the item (from this handle) |
+| `data-grabbed` | root, item, drag handle | the keyboard holds the item |
+| `data-static` | item | the item never moves |
+| `data-draggable` | item, drag handle | people may drag the item now |
+| `data-resizable` | item | people may resize the item now |
+| `data-side` | resize handle | its side: `top`, `bottom`, `start`, `end` or a corner |
+| `data-kind` | placeholder | `move`, `resize` or `keyboard` |
+
+## From state functions
+
+`className` and `style` also take a function of the part's state, which holds the same and more:
+`itemId`, `item` (its place and size), `placed` and `handled` on an item.
+
+```tsx title="card.tsx"
+<GridLayout.Item
+    itemId={item.id}
+    className={(state) => (state.dragging ? "card card-lifted" : "card")}
+/>
+```
+
+<Example id="styling-showcase" />

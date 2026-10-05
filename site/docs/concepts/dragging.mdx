@@ -1,0 +1,27 @@
+---
+title: Dragging
+description: How a press becomes a drag, where an item drags from, what never drags, and how a gesture ends.
+---
+
+A press on an item stays a click until the pointer moves past a small threshold (`threshold`,
+3 pixels by default). Past it, the item follows the pointer, the others move out of the way in the
+preview, and the placeholder shows where it would land. Releasing commits one `item.move`.
+
+One path serves mouse, touch and pen, through pointer events. The item the pointer holds is drawn
+by the engine at the pointer, once a frame: React renders only when the item would land somewhere
+else.
+
+## Where it drags from
+
+- From the item's body, unless the item has a `GridLayout.DragHandle`: then only from the handle.
+- Never from a control inside the item (a field, a button, a link, editable text), nor from a
+  subtree marked `data-grid-layout-no-drag`.
+- Never when the grid's `draggable` is false, nor an item's `draggable` is false, nor it is static.
+
+## How it ends
+
+Releasing commits the move. Escape, a pointer cancelled by the browser, a lost capture or a move
+with no button put the item back, and nothing is told. The click a drag ends with is swallowed.
+`bounded` keeps the dragged item inside the root.
+
+<Example id="drag-handle" />

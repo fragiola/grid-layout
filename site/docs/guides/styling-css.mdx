@@ -1,0 +1,47 @@
+---
+title: Styling with plain CSS
+description: Style the parts with any stylesheet through their data attributes, with no class names required at all.
+---
+
+The parts carry `data-grid-layout-part` and their state as `data-*` attributes, so plain CSS needs
+no class names at all.
+
+```css title="grid.css"
+[data-grid-layout-part="item"] {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: grab;
+}
+
+[data-grid-layout-part="item"][data-dragging] {
+    cursor: grabbing;
+    box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
+}
+
+[data-grid-layout-part="item"][data-static] {
+    background: #f6f6f6;
+    cursor: default;
+}
+
+[data-grid-layout-part="resize-handle"] {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+}
+
+[data-side="bottom-end"] {
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    cursor: nwse-resize;
+}
+
+[data-grid-layout-part="placeholder"] {
+    border: 2px dashed royalblue;
+    border-radius: 8px;
+}
+```
+
+Scope the rules under a class on `Root` when a page has more than one grid.
+
+<Example id="unstyled" />

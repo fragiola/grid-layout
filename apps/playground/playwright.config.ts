@@ -9,7 +9,7 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: CI,
     retries: CI ? 2 : 0,
-    // scroll and focus timing is sensitive to a contended dev server: few workers in CI
+    // pointer and focus timing is sensitive to a contended dev server: few workers in CI
     workers: CI ? 2 : 4,
     reporter: CI ? [["line"], ["html", { open: "never" }]] : "line",
     use: {
@@ -17,8 +17,22 @@ export default defineConfig({
         trace: "on-first-retry",
     },
     projects: [
-        { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-        { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+        {
+            name: "chromium",
+            use: { ...devices["Desktop Chrome"] },
+            testIgnore: /\.touch\.spec\.ts$/,
+        },
+        {
+            name: "firefox",
+            use: { ...devices["Desktop Firefox"] },
+            testIgnore: /\.touch\.spec\.ts$/,
+        },
+        // a phone: real touch input (Chromium's), for the specs written for it
+        {
+            name: "touch",
+            use: { ...devices["Pixel 7"] },
+            testMatch: /\.touch\.spec\.ts$/,
+        },
     ],
     webServer: {
         command: "pnpm dev",

@@ -1,0 +1,27 @@
+---
+title: Resizing
+description: Resize handles on any side or corner, the edge that stays put, and the limits a resize stops at.
+---
+
+A `GridLayout.ResizeHandle` is a side or corner its item is resized from. Pull it and the item
+grows or shrinks by whole columns and rows, the opposite edge staying put, and what it grows into
+is pushed past its new edge.
+
+```tsx title="corners.tsx"
+<GridLayout.ResizeHandle side="bottom-end" aria-label={`Resize ${name}`} className="corner" />
+```
+
+The sides are logical: `top`, `bottom`, `start`, `end`, and the corners `top-start`, `top-end`,
+`bottom-start`, `bottom-end`. In right-to-left, `start` is the right edge.
+
+## Limits
+
+A resize stops at the item's `minW`, `maxW`, `minH` and `maxH`, at the grid's columns and at
+`maxRows`, whichever side pulls. A handle renders nothing while its item cannot be resized.
+
+<Callout type="info" title="A handle needs a box">
+A handle has no size or place of its own: give it both, or there is nothing to press. Its
+`touch-action` is set for you, so a touch on it resizes rather than scrolls.
+</Callout>
+
+<Example id="resize-handles" />

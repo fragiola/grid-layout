@@ -7,7 +7,14 @@ import { collectErrors, EXAMPLES, openExample, reset, THEMES } from "./helpers";
 // `E2E_ALL_THEMES=1` runs every example in every theme.
 
 /** Examples run in every theme, chosen so that together they cover what a theme can break. */
-const REPRESENTATIVE: string[] = [];
+const REPRESENTATIVE: string[] = [
+    "hello-grid", // the baseline: cards, the placeholder, a resize corner
+    "styling-showcase", // transitions, the lift, the striped placeholder, hover handles
+    "keyboard", // the app's panel and live region around the grid
+    "resize-handles", // the eight handles, drawn with the theme's tokens
+    "compaction-modes", // Fragiola UI buttons and switches beside the grid
+    "rtl-layout", // right-to-left text and mirrored places
+];
 
 const slugs = new Set(EXAMPLES.map((example) => example.slug));
 const missing = REPRESENTATIVE.filter((slug) => !slugs.has(slug));

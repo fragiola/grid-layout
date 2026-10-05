@@ -1,0 +1,35 @@
+---
+title: The primitive contract
+description: How every GridLayout part renders, takes your props and exposes its state, so you can style and compose it freely.
+---
+
+Every part follows the same rules.
+
+- **`render`, never `asChild`.** `render={<section />}` merges the part's props into your element;
+  `render={(props, state) => …}` hands you both.
+- **`ref` is a plain prop**, merged with the part's own.
+- **Your props are forwarded**, and your handlers run after the part's own. On `Root`, the grid's
+  pointer and key handling runs after yours: `preventDefault` vetoes a gesture or replaces a key.
+- **`className` and `style` take a value or a function of the state.** Your style sits under the
+  part's structural style.
+- **Structural inline style only**: a position, a size, a transform, the held item above the others,
+  `touch-action: none` on handles, and a placeholder that never takes the pointer. Nothing cosmetic.
+- **State through `data-*` and ARIA**, present or absent, never `"false"`.
+  See [State attributes](/docs/concepts/state-attributes).
+- **No text and no names.** Give every item, handle and button its accessible name.
+- **You own the recursion.** `GridLayout.Items` is a children function over the layout's items.
+
+## The parts
+
+| part | hook | what it is |
+| --- | --- | --- |
+| `GridLayout.Root` | `useGridLayout`, `useGridLayoutView` | the positioned box the items are placed in |
+| `GridLayout.Items` | `useItems` | a children function over the items, keyed by id |
+| `GridLayout.Item` | `useItem` | an item, placed at its box; a tab stop |
+| `GridLayout.DragHandle` | `useDragHandle` | the only place its item drags from, and its tab stop |
+| `GridLayout.ResizeHandle` | `useResizeHandle` | a side or corner the item is resized from |
+| `GridLayout.Placeholder` | `usePlaceholder` | where the held item would land, during a gesture |
+
+A part hook returns `{ state, props }`: spread `props` onto any element to make it that part.
+
+<Example id="unstyled" />

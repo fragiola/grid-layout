@@ -1,0 +1,61 @@
+---
+title: Model and engine
+description: The layout lives in a typed model every change goes through as a command; an engine binds one grid to the page and runs the gestures.
+---
+
+## The model
+
+The model holds the grid's data and rules: the items, the columns, how the layout settles and how
+collisions are handled. Every change is a **command** run through a chain of middleware, and every
+committed layout is valid: in bounds, settled, and never overlapping unless you allow it.
+
+```ts title="model.ts"
+const { model } = useGridLayout();
+
+model.run("item.move", { itemId: "revenue", x: 4, y: 0 });
+model.run("item.resize", { itemId: "revenue", w: 6, h: 3, side: "bottom-end" });
+model.can("item.remove", { itemId: "banner" }); // a dry run: would it apply?
+model.get("item-by", { itemId: "revenue" }); // { id, x, y, w, h, … }
+```
+
+A command never throws on bad input: it returns `{ ok: true, value }` or
+`{ ok: false, error: { code, message } }`, with codes like `not_found`, `refused` (a static item),
+`collision` (under `preventCollision`) and `vetoed`.
+
+| command | what it does |
+| --- | --- |
+| `layout.set` | replaces the layout, corrected and settled |
+| `item.add` | adds an item at its cell, or the first free one |
+| `item.remove` | removes an item |
+| `item.move` | moves an item, pushing what it lands on |
+| `item.resize` | resizes an item from a side, the opposite edge staying put |
+| `item.place` | moves and resizes at once (the keyboard's drop) |
+| `item.configure` | changes an item's limits and flags |
+| `grid.configure` | changes the columns, rows, compaction and collision rules |
+
+## Middleware
+
+A middleware sees every command, from a drag, a key or your own code. It can **refuse** it, **rewrite**
+its payload, or **observe** its result.
+
+```ts title="locked-zone.ts"
+model.use((ctx, next) => {
+    if (ctx.command === "item.move" && ctx.payload.y < 1) return veto("the first row is the banner's");
+    return next();
+});
+```
+
+A gesture checks the model while it runs: a landing a middleware would refuse shows the item going
+back where it was, and the drop changes nothing.
+
+## The engine
+
+An engine is one grid on screen. It measures the root, turns the layout into pixels, runs the
+pointer and keyboard gestures, and previews where the held item would land. A gesture ends in one
+command, or none.
+
+`engine.get("gesture")` reads the gesture in progress, `engine.get("cell-at", { clientX, clientY })`
+the cell under a point, and `engine.run("cancel-gesture")` ends one. `useGridLayoutEvents` hears
+each step of a gesture, for callbacks and announcements.
+
+<Example id="messy-layout" />

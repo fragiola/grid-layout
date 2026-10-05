@@ -1,0 +1,30 @@
+---
+title: Installation
+description: Install the React package, check the peer dependencies, and see why there is no stylesheet to import.
+---
+
+## Install the package
+
+```sh title="Terminal"
+pnpm add @fragiola/grid-layout-react
+```
+
+The core, `@fragiola/grid-layout`, comes along: import its types and helpers from the React
+package, which re-exports it.
+
+## Peer dependencies
+
+The React package needs React 19 (`react` and `react-dom`). It has no other runtime dependency,
+and the core has none at all: no drag library, no resize library.
+
+## No stylesheet
+
+There is nothing to import for styles. The primitives set only the inline style they need to work
+(a position, a size, a transform). Style every part with your own classes, through `className`,
+`style` or `render`. See [Styling with Tailwind](/docs/guides/styling-tailwind) and
+[Styling with plain CSS](/docs/guides/styling-css).
+
+<Callout type="info" title="A width to lay out in">
+`GridLayout.Root` measures its own width and places the items in it. Give it a width (or let it
+fill its parent): its height follows the layout.
+</Callout>

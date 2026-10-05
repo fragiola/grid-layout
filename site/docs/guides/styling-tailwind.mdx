@@ -1,0 +1,40 @@
+---
+title: Styling with Tailwind
+description: Style every part with Tailwind classes, state variants on data attributes, and functions of the part's state.
+---
+
+Every part takes `className`. With Tailwind, a state is a variant on its data attribute.
+
+```tsx title="card.tsx"
+<GridLayout.Item
+    itemId={item.id}
+    className="rounded-lg border bg-white p-3 shadow-sm cursor-grab data-dragging:cursor-grabbing data-dragging:shadow-xl"
+/>
+```
+
+For conditions Tailwind cannot read from an attribute, pass a function of the part's state:
+
+```tsx title="card.tsx"
+<GridLayout.Item
+    itemId={item.id}
+    className={(state) => cn("rounded-lg border p-3", state.static ? "bg-gray-50" : "bg-white shadow-sm")}
+/>
+```
+
+## Handles
+
+A handle has no box of its own: give it a size and a place. Logical utilities (`end-0`, `start-0`)
+mirror for right-to-left.
+
+```tsx title="corner.tsx"
+<GridLayout.ResizeHandle
+    side="bottom-end"
+    aria-label="Resize"
+    className="absolute end-0 bottom-0 size-4 cursor-se-resize rtl:cursor-sw-resize"
+/>
+```
+
+The examples keep every class in a `styles.ts` beside the component and read the theme's tokens:
+see [`hello-grid`](/examples/hello-grid).
+
+<Example id="static-items" />

@@ -1,12 +1,85 @@
 {
     "sections": [
         {
-            "label": "Project",
+            "label": "Getting started",
             "pages": [
                 {
-                    "label": "Limitations and roadmap",
-                    "path": "limitations"
+                    "label": "Introduction",
+                    "path": "getting-started/introduction"
+                },
+                {
+                    "label": "Installation",
+                    "path": "getting-started/installation"
+                },
+                {
+                    "label": "Your first grid",
+                    "path": "getting-started/first-grid"
+                },
+                {
+                    "label": "Columns, rows and gaps",
+                    "path": "getting-started/geometry"
                 }
+            ]
+        },
+        {
+            "label": "Concepts",
+            "collapsible": true,
+            "defaultOpen": true,
+            "pages": [
+                {
+                    "label": "Model and engine",
+                    "path": "concepts/model-and-engine"
+                },
+                {
+                    "label": "The primitive contract",
+                    "path": "concepts/primitive-contract"
+                },
+                {
+                    "label": "State attributes",
+                    "path": "concepts/state-attributes"
+                },
+                { "label": "Layout items", "path": "concepts/layout-items" },
+                {
+                    "label": "Collisions and compaction",
+                    "path": "concepts/collisions-and-compaction"
+                },
+                { "label": "Dragging", "path": "concepts/dragging" },
+                { "label": "Resizing", "path": "concepts/resizing" },
+                {
+                    "label": "Keyboard and accessibility",
+                    "path": "concepts/keyboard-and-accessibility"
+                },
+                { "label": "Right-to-left", "path": "concepts/rtl" }
+            ]
+        },
+        {
+            "label": "Guides",
+            "collapsible": true,
+            "defaultOpen": true,
+            "pages": [
+                {
+                    "label": "Styling with Tailwind",
+                    "path": "guides/styling-tailwind"
+                },
+                {
+                    "label": "Styling with plain CSS",
+                    "path": "guides/styling-css"
+                },
+                {
+                    "label": "Transitions and the placeholder",
+                    "path": "guides/transitions-and-placeholder"
+                },
+                { "label": "Saving a layout", "path": "guides/persistence" },
+                {
+                    "label": "Content inside items",
+                    "path": "guides/content-inside-items"
+                }
+            ]
+        },
+        {
+            "label": "Project",
+            "pages": [
+                { "label": "Limitations and roadmap", "path": "limitations" }
             ]
         }
     ]

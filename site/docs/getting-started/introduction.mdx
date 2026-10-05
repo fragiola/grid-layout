@@ -1,0 +1,38 @@
+---
+title: Introduction
+description: What Grid Layout is, what it ships and what it leaves to you, and where its ideas come from.
+---
+
+Grid Layout places items on a grid of columns and rows and lets people rearrange them: drag an item
+and it pushes what it lands on out of the way, pull an edge and it grows, and the layout settles
+after every change. Dashboards, widget boards, bento layouts.
+
+It is **headless**. It ships the behaviour (placing, dragging, resizing, collisions, compaction,
+the keyboard, right-to-left) and composable React primitives. It ships no CSS, no icons, no handle
+you cannot restyle and no text. What every part looks like is yours.
+
+<Example id="hello-grid" variant="card" />
+
+## Two packages
+
+| package | what it is |
+| --- | --- |
+| `@fragiola/grid-layout` | the core, framework-free: the layout rules, a typed model of commands, and the engine that binds one grid to the page |
+| `@fragiola/grid-layout-react` | the `GridLayout.*` primitives and hooks over the core; it re-exports the core |
+
+Install the React package; the core comes with it.
+
+## Where the ideas come from
+
+The behaviour follows [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout):
+how items push each other, how compaction settles a layout, how a resize keeps its opposite edge.
+The architecture is Fragiola's, shared with Dockable and Data Grid: a model every change goes
+through as a command, an engine per grid on screen, and primitives you style from outside.
+
+What is new: the keyboard (grab, move, resize, drop), logical sides for right-to-left, one pointer
+path for mouse, touch and pen, and no stylesheet at all.
+
+<Cards>
+<Card title="Installation" href="/docs/getting-started/installation" description="The package, its peers, and why there is nothing to import for styles." />
+<Card title="Your first grid" href="/docs/getting-started/first-grid" description="From a layout to a dashboard that drags, resizes and is styled." />
+</Cards>
