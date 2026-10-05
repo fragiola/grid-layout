@@ -6,7 +6,11 @@ import { useCallback, useState } from "react";
 /** The parts of a gesture event an announcement reads. */
 export interface GestureLike {
     readonly type: string;
-    readonly source: "pointer" | "keyboard";
+    readonly source: "pointer" | "keyboard" | "native";
+    /** a new item coming from outside the grid */
+    readonly external?: boolean;
+    /** released off the grid */
+    readonly outside?: boolean;
     readonly before: {
         readonly x: number;
         readonly y: number;
@@ -31,6 +35,20 @@ export function describeGesture(
     event: GestureLike,
     name: string,
 ): string | undefined {
+    if (event.external) {
+        switch (event.type) {
+            case "grab":
+                return `${name} brought into the grid at ${place(event.item)}, ${size(event.item)}. Arrows move it, Shift and the arrows resize it, Space or Enter adds it, Escape leaves it out.`;
+            case "drop":
+                return `${name} added at ${place(event.item)}, ${size(event.item)}.`;
+            case "cancel":
+            case "drop-cancel":
+                return `${name} not added.`;
+        }
+    }
+    if (event.type === "drag-stop" && event.outside) {
+        return `${name} released outside the grid.`;
+    }
     switch (event.type) {
         case "grab":
             return `${name} grabbed at ${place(event.item)}, ${size(event.item)}. Arrows move it, Shift and the arrows resize it, Space or Enter drops it, Escape puts it back.`;

@@ -9,7 +9,7 @@ import type { GridLayoutView } from "./types";
 
 /** The style a part needs to work: where it is, how big, what is on top. Nothing cosmetic. */
 export interface StructuralStyle {
-    readonly position?: "relative" | "absolute";
+    readonly position?: "relative" | "absolute" | "fixed";
     readonly top?: number;
     readonly left?: number;
     readonly width?: number;
@@ -20,7 +20,7 @@ export interface StructuralStyle {
     readonly zIndex?: number;
     /** a handle's touch gestures are drags, never scrolls (D7) */
     readonly touchAction?: "none";
-    /** a placeholder never takes the pointer */
+    /** a placeholder and a drag preview never take the pointer */
     readonly pointerEvents?: "none";
 }
 
@@ -61,16 +61,27 @@ export interface RootState {
     readonly resizing: boolean;
     /** the keyboard holds an item */
     readonly grabbed: boolean;
+    /** a new item from outside is over the grid */
+    readonly dropping: boolean;
+    /** an external drag over the grid would not drop */
+    readonly dropRefused: boolean;
+    /** the pointer holding an item or bringing one is off the grid */
+    readonly outside: boolean;
     readonly dir: "ltr" | "rtl";
 }
 
 /** The root: the positioned box the items are placed in, as tall as the layout with `autoSize`. */
 export function rootPart(view: GridLayoutView): Part<RootState> {
-    const kind = view.gesture?.kind;
+    const gesture = view.gesture;
+    const kind = gesture?.kind;
+    const outside = gesture?.outside === true;
     const state: RootState = {
         dragging: kind === "move",
         resizing: kind === "resize",
         grabbed: kind === "keyboard",
+        dropping: kind === "drop" && !outside,
+        dropRefused: view.dropRefused && !outside,
+        outside,
         dir: view.dir,
     };
     return {
@@ -81,6 +92,9 @@ export function rootPart(view: GridLayoutView): Part<RootState> {
                 "data-dragging": state.dragging,
                 "data-resizing": state.resizing,
                 "data-grabbed": state.grabbed,
+                "data-dropping": state.dropping,
+                "data-drop-refused": state.dropRefused,
+                "data-outside": state.outside,
             }),
         },
         style:
@@ -101,6 +115,8 @@ export interface ItemState {
     readonly resizing: boolean;
     /** the keyboard holds it */
     readonly grabbed: boolean;
+    /** a pointer holds it off the grid: released there, it stays where it was */
+    readonly outside: boolean;
     readonly static: boolean;
     /** people may drag it now (the grid's and its own setting) */
     readonly draggable: boolean;
@@ -118,7 +134,11 @@ export function itemPart(
     itemId: string,
 ): Part<ItemState> & { readonly tabIndex: number } {
     const item = view.items.get(itemId);
-    const gesture = view.gesture?.itemId === itemId ? view.gesture : undefined;
+    // a drop holds a new item, never one of these (even under an id the layout already has)
+    const gesture =
+        view.gesture?.itemId === itemId && view.gesture.kind !== "drop"
+            ? view.gesture
+            : undefined;
     const isStatic = item?.static === true;
     const state: ItemState = {
         itemId,
@@ -126,6 +146,7 @@ export function itemPart(
         dragging: gesture?.kind === "move",
         resizing: gesture?.kind === "resize",
         grabbed: gesture?.kind === "keyboard",
+        outside: gesture?.outside === true,
         static: isStatic,
         draggable:
             view.draggable &&
@@ -153,6 +174,7 @@ export function itemPart(
                 "data-dragging": state.dragging,
                 "data-resizing": state.resizing,
                 "data-grabbed": state.grabbed,
+                "data-outside": state.outside,
                 "data-static": state.static,
                 "data-draggable": state.draggable,
                 "data-resizable": state.resizable,
@@ -243,15 +265,20 @@ export function resizeHandlePart(
 /** The placeholder's state, while a gesture is in progress. */
 export interface PlaceholderState {
     readonly itemId: string;
-    readonly kind: "move" | "resize" | "keyboard";
+    readonly kind: "move" | "resize" | "keyboard" | "drop";
 }
 
-/** Where the held item would land: present only during a gesture. */
+/**
+ * Where the held item would land: present only during a gesture, and for a drop only while it
+ * would land somewhere (over the grid, not refused).
+ */
 export function placeholderPart(
     view: GridLayoutView,
 ): Part<PlaceholderState> | undefined {
     const gesture = view.gesture;
     if (!gesture) return undefined;
+    if (gesture.kind === "drop" && (gesture.outside || gesture.refused))
+        return undefined;
     return {
         state: { itemId: gesture.itemId, kind: gesture.kind },
         attributes: {
@@ -261,6 +288,97 @@ export function placeholderPart(
         style: {
             ...boxStyle(view, gesture.placeholder),
             pointerEvents: "none",
+        },
+    };
+}
+
+/** A drag source's state. */
+export interface DragSourceState {
+    /** a pointer brings its item */
+    readonly dragging: boolean;
+    /** the keyboard holds its item in the grid */
+    readonly grabbed: boolean;
+    /** it starts nothing */
+    readonly disabled: boolean;
+}
+
+/**
+ * A drag source: an element anywhere on the page whose press or Space/Enter brings a new item
+ * into the grid (X1, X6). `view` is `undefined` until a grid is reachable.
+ */
+export function dragSourcePart(
+    view: GridLayoutView | undefined,
+    source: Element | null,
+    disabled: boolean,
+): Part<DragSourceState> & { readonly tabIndex: number } {
+    const gesture = view?.gesture;
+    const mine =
+        gesture?.kind === "drop" &&
+        source !== null &&
+        gesture.origin === source;
+    const state: DragSourceState = {
+        dragging: mine && gesture.source === "pointer",
+        grabbed: mine && gesture.source === "keyboard",
+        disabled,
+    };
+    return {
+        state,
+        attributes: {
+            [PART_ATTRIBUTE]: "drag-source",
+            ...flags({
+                "data-dragging": state.dragging,
+                "data-grabbed": state.grabbed,
+                "data-disabled": state.disabled,
+            }),
+        },
+        style: { touchAction: "none" },
+        tabIndex: disabled ? -1 : 0,
+    };
+}
+
+/** The drag preview's state, while a pointer brings a new item. */
+export interface DragPreviewState {
+    /** the item's id in the preview */
+    readonly itemId: string;
+    /** the drop's data, as its source gave it */
+    readonly data: unknown;
+    /** the pointer is over the grid */
+    readonly over: boolean;
+    /** the grid would not take it there */
+    readonly refused: boolean;
+}
+
+/**
+ * What follows the pointer while it brings a new item: present only during a pointer drop. The
+ * engine keeps it at the pointer (its `transform`); its look is the app's.
+ */
+export function dragPreviewPart(
+    view: GridLayoutView | undefined,
+): Part<DragPreviewState> | undefined {
+    const gesture = view?.gesture;
+    if (gesture?.kind !== "drop" || gesture.source !== "pointer")
+        return undefined;
+    const state: DragPreviewState = {
+        itemId: gesture.itemId,
+        data: gesture.data,
+        over: !gesture.outside,
+        refused: gesture.refused && !gesture.outside,
+    };
+    return {
+        state,
+        attributes: {
+            [PART_ATTRIBUTE]: "drag-preview",
+            ...flags({
+                "data-over": state.over,
+                "data-drop-refused": state.refused,
+            }),
+        },
+        style: {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            pointerEvents: "none",
+            zIndex: 1,
         },
     };
 }

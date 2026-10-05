@@ -167,8 +167,10 @@ describe("dragging with a pointer", () => {
             if (end === "cancel") press.cancel();
             if (end === "lost") {
                 grid.item("a").dispatchEvent(
+                    // it bubbles, as the browser's does
                     new PointerEvent("lostpointercapture", {
                         pointerId: press.pointerId,
+                        bubbles: true,
                     }),
                 );
             }

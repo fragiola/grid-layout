@@ -6,6 +6,7 @@ import { afterEach, vi } from "vitest";
 import {
     createGridLayoutEngine,
     createGridLayoutModel,
+    type ExternalDrop,
     type GestureEvent,
     type GridLayoutEngineOptions,
     type GridLayoutModelOptions,
@@ -101,11 +102,24 @@ export function setup(options: HarnessOptions = {}) {
     if (dir) root.style.direction = dir;
     const size = { width };
     Object.defineProperty(root, "clientWidth", { get: () => size.width });
+    // the root's box on screen: at the viewport's corner, as tall as the layout it shows
+    root.getBoundingClientRect = () =>
+        new DOMRect(0, 0, size.width, engine.adapter.getView().height);
     document.body.append(root);
     root.addEventListener("pointerdown", (event) =>
         engine.adapter.pointerdown(event),
     );
     root.addEventListener("keydown", (event) => engine.adapter.keydown(event));
+    for (const type of [
+        "dragenter",
+        "dragover",
+        "dragleave",
+        "drop",
+    ] as const) {
+        root.addEventListener(type, (event) =>
+            engine.adapter[type](event as DragEvent),
+        );
+    }
     let views = 0;
     engine.adapter.subscribe(() => {
         views++;
@@ -160,6 +174,29 @@ export function setup(options: HarnessOptions = {}) {
             const element = document.createElement("span");
             item(id).append(element);
             engine.adapter.registerResizeHandle(id, side, element);
+            return element;
+        },
+        /** a drag source outside the root, wired as an adapter wires one */
+        source(drop: ExternalDrop): HTMLElement {
+            const element = document.createElement("div");
+            element.tabIndex = 0;
+            document.body.append(element);
+            element.addEventListener("pointerdown", (event) =>
+                engine.adapter.startExternalDrag(event, element, drop),
+            );
+            element.addEventListener("keydown", (event) =>
+                engine.adapter.startExternalGrab(event, element, drop),
+            );
+            return element;
+        },
+        /** registers the element of an item the layout gained (a drop), as an adapter would */
+        mount(id: string): HTMLElement {
+            const element = document.createElement("div");
+            element.setAttribute("data-grid-layout-part", "item");
+            element.tabIndex = 0;
+            root.append(element);
+            engine.adapter.registerItem(id, element);
+            elements.set(id, element);
             return element;
         },
         /** changes the root's width and tells the observer, as a resize does */
@@ -240,4 +277,32 @@ export function key(
     });
     target.dispatchEvent(event);
     return event;
+}
+
+/**
+ * A native drag event (jsdom has no `DragEvent`): a mouse event with a `DataTransfer` stand-in
+ * that records the drop effect.
+ */
+export function nativeDrag(
+    target: Element,
+    type: "dragenter" | "dragover" | "dragleave" | "drop",
+    x: number,
+    y: number,
+    files: readonly string[] = [],
+): MouseEvent & { dataTransfer: { dropEffect: string } } {
+    const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+    });
+    const dataTransfer = {
+        dropEffect: "none",
+        effectAllowed: "all",
+        types: files.length > 0 ? ["Files"] : [],
+        files: files.map((name) => ({ name })),
+    };
+    Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+    target.dispatchEvent(event);
+    return event as MouseEvent & { dataTransfer: { dropEffect: string } };
 }
