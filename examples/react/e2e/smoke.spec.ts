@@ -14,6 +14,8 @@ const REPRESENTATIVE: string[] = [
     "resize-handles", // the eight handles, drawn with the theme's tokens
     "compaction-modes", // Fragiola UI buttons and switches beside the grid
     "rtl-layout", // right-to-left text and mirrored places
+    "widget-sidebar", // drag sources, a drag preview and widgets of several kinds
+    "dashboard-builder", // the sidebar, a trash and the app's buttons together
 ];
 
 const slugs = new Set(EXAMPLES.map((example) => example.slug));

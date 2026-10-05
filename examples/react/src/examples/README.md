@@ -28,7 +28,9 @@ looking for its feature would search, and `order` is its place inside the catego
 | `resizing` | sizing items: the eight sides, minimum and maximum sizes |
 | `compaction` | how items settle: vertical, horizontal, none, collisions, overlap |
 | `keyboard` | moving and resizing without a pointer, and what is announced |
+| `external-drop` | things from outside the grid becoming items: drag sources, a toolbox, drop rules, files |
 | `styling` | how the grid looks when it is not about one feature: transitions, the placeholder, RTL |
+| `apps` | several features together, as an app would put them: a dashboard builder |
 
 ## Adding an example
 

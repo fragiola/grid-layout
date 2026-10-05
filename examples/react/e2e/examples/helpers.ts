@@ -83,3 +83,28 @@ export async function expectNoOverlap(page: Page) {
         }
     }
 }
+
+/** Presses `locator` at its center and moves to a viewport point, then releases unless told not to. */
+export async function dragTo(
+    page: Page,
+    locator: Locator,
+    to: { x: number; y: number },
+    options: { release?: boolean } = {},
+) {
+    const box = await boxOf(locator);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    if (options.release !== false) {
+        await page.mouse.up();
+        await settled(page);
+    }
+}
+
+/** A point inside the grid's root, as fractions of its width and height. */
+export async function inRoot(page: Page, fx: number, fy: number) {
+    const root = await boxOf(
+        page.getByTestId("stage").locator('[data-grid-layout-part="root"]'),
+    );
+    return { x: root.x + root.width * fx, y: root.y + root.height * fy };
+}

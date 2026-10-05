@@ -14,7 +14,9 @@ export const CATEGORIES = [
     "resizing",
     "compaction",
     "keyboard",
+    "external-drop",
     "styling",
+    "apps",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -26,7 +28,9 @@ export const CATEGORY_TITLES: Record<Category, string> = {
     resizing: "Resizing",
     compaction: "Compaction",
     keyboard: "Keyboard",
+    "external-drop": "External drop",
     styling: "Styling",
+    apps: "Apps",
 };
 
 export interface ExampleMeta {
@@ -63,5 +67,7 @@ export const DEFAULT_HEIGHT: Record<Category, number> = {
     resizing: 480,
     compaction: 520,
     keyboard: 480,
+    "external-drop": 540,
     styling: 480,
+    apps: 600,
 };
