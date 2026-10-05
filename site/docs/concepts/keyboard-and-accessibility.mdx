@@ -16,6 +16,12 @@ Every item is a tab stop (its drag handle, when it has one).
 The arrows follow what they show: in right-to-left, ArrowRight moves toward the inline start. A step
 a middleware would refuse is not taken. A drop commits one command.
 
+## Bringing items in
+
+A drag source is a tab stop too. Enter or Space on it brings its item into the grid at the first
+free cell, already grabbed; the same keys place it, and Enter adds it and moves the focus to it.
+See [External drop](/docs/concepts/external-drop).
+
 ## Replacing a key
 
 Your `onKeyDown` on `Root` runs first: `preventDefault` cancels or replaces any of these keys.
@@ -24,7 +30,7 @@ Your `onKeyDown` on `Root` runs first: `preventDefault` cancels or replaces any 
 
 The primitives set no role, no name and no text. The grid tells you each step (`grab`, `move`,
 `resize`, `drop`, `cancel`) through `useGridLayoutEvents`; say it in a live region in your own
-words.
+words. A step of an item coming in from outside carries `external: true`.
 
 ```tsx title="announcer.tsx"
 function Announcer({ onMessage }: { onMessage: (message: string) => void }) {

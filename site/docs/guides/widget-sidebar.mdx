@@ -1,0 +1,91 @@
+---
+title: A widget sidebar
+description: Build a sidebar of widgets outside the grid that people drag in or bring in from the keyboard, step by step.
+---
+
+A sidebar of widgets beside a dashboard: each card brings its widget in at its own size, by
+pointer or keyboard, and the dashboard remembers which widget each item is.
+
+## 1. A ref the sidebar and the grid share
+
+The sidebar is outside the grid's root, so it reaches the grid through a `gridLayoutRef`. Make one
+in the component that holds both, and give it to the root.
+
+```tsx title="dashboard.tsx"
+const gridLayoutRef = useGridLayoutRef();
+
+<GridLayout.Root gridLayoutRef={gridLayoutRef} defaultLayout={layout}>…</GridLayout.Root>
+```
+
+Its `current` is `{ model, engine }` while the root is mounted, and `null` before. Hooks given the
+ref follow it from anywhere (`useGridLayout(ref)`, `useGridLayoutView(ref)`,
+`useGridLayoutEvents(listener, ref)`).
+
+## 2. A drag source per widget
+
+Each card is a `GridLayout.DragSource` with the widget's size and its kind as `data`.
+
+```tsx title="sidebar.tsx"
+{CATALOGUE.map((entry) => (
+    <GridLayout.DragSource
+        key={entry.kind}
+        gridLayoutRef={gridLayoutRef}
+        item={entry.size}
+        data={entry.kind}
+        aria-label={`${entry.title} widget`}
+    >
+        {entry.title}
+    </GridLayout.DragSource>
+))}
+```
+
+The source renders only its children: name it yourself. It carries `data-dragging` while a pointer
+brings its widget, and `data-grabbed` while the keyboard does.
+
+## 3. Remember what each item is
+
+The layout holds ids and boxes only. On the drop, keep the kind under the new id.
+
+```tsx title="dashboard.tsx"
+<GridLayout.Root
+    gridLayoutRef={gridLayoutRef}
+    createId={() => `widget-${++count}`}
+    onDrop={({ item, data }) => setKinds((all) => ({ ...all, [item.id]: data }))}
+>
+```
+
+An id that says its kind (`itemId="chart-3"` on the source) lets the saved layout alone rebuild
+the dashboard, as the dashboard builder does.
+
+## 4. What follows the pointer
+
+A `GridLayout.DragPreview` follows the pointer while it brings a widget. Hide it over the grid
+(`data-over`) if the placeholder says enough.
+
+```tsx title="preview.tsx"
+<GridLayout.DragPreview gridLayoutRef={gridLayoutRef} className="drag-card">
+    {(state) => titleOf(state.data)}
+</GridLayout.DragPreview>
+```
+
+## 5. The keyboard, and what is said
+
+Every card is a tab stop: Enter brings its widget in at the first free cell, the arrows place it,
+Enter adds it and the focus moves to it, Escape leaves it out. Tell people the keys
+(`aria-describedby`) and say each step in a live region, from outside the root.
+
+```tsx title="announcer.tsx"
+useGridLayoutEvents((event) => {
+    if (event.external && event.type === "drop") say(`${titleOf(event.data)} added.`);
+}, gridLayoutRef);
+```
+
+<Example id="widget-sidebar" />
+
+## 6. A trash, and saving
+
+Released off the grid, an item reports where (`onDragStop` with `outside` and `target`): remove
+it when the target is your trash. Save the layout on `onLayoutChange`, as in
+[Saving a layout](/docs/guides/persistence).
+
+<Example id="dashboard-builder" />

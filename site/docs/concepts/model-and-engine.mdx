@@ -59,3 +59,19 @@ the cell under a point, and `engine.run("cancel-gesture")` ends one. `useGridLay
 each step of a gesture, for callbacks and announcements.
 
 <Example id="messy-layout" />
+
+## Outside the root
+
+`useGridLayout()` reads the grid inside its root. Elsewhere on the page (a toolbar, a sidebar),
+give the root a `gridLayoutRef` and read the grid through it: its `current` is `{ model, engine }`
+while the root is mounted, and `null` before.
+
+```tsx title="toolbar.tsx"
+const gridLayoutRef = useGridLayoutRef();
+
+<Toolbar onClear={() => gridLayoutRef.current?.model.run("layout.set", { layout: [] })} />
+<GridLayout.Root gridLayoutRef={gridLayoutRef}>…</GridLayout.Root>
+```
+
+`useGridLayout(gridLayoutRef)` follows it from any component, and renders again when a root takes
+or releases it.
