@@ -1,0 +1,127 @@
+/* Theme "light" — Neutral and quiet: the reference look.
+
+   One file per theme, selected by data-example-theme="light" on any element
+   (the docs put it on <body>, as an app would). A theme only sets values; it styles
+   no markup. It declares:
+     1. shape tokens (--gl-*) that the examples' class names read: fonts and sizes
+        (--gl-font, --gl-font-size), the item's padding, corners, frame and shadow
+        (--gl-item-padding, --gl-radius, --gl-border, --gl-shadow), the shadow of an item
+        being dragged (--gl-lift-shadow), the resize handles' hit size (--gl-handle-size),
+        the placeholder's outline (--gl-placeholder-style, --gl-placeholder-width), the
+        focus ring (--gl-focus-width), a widget title's type (--gl-title-weight,
+        --gl-title-transform, --gl-title-tracking) and motion (--gl-motion);
+     2. the Fragiola palettes the examples use, each with all SIX roles
+        (base, soft, line, contrast, accent, ring). A palette that omitted one
+        would inherit it from the page and leak across the theme boundary;
+     3. on every palette, the colour tokens that depend on it: the grid's canvas
+        (--gl-canvas-bg), an item's frame (--gl-item-line), the placeholder (--gl-placeholder-bg,
+        --gl-placeholder-line), the handles (--gl-handle-color) and the focus ring and grabbed
+        item (--gl-focus-line). They are declared per palette so that var(--palette-…)
+        resolves against the palette the element sits in.
+
+   Geometry is not a token: the columns, row height, gap and padding are the grid's own
+   configuration (they decide where items are), never CSS.
+
+   Specificity: the palette rules are ":root [data-example-theme="light"] .palette-x", which ties
+   with Fragiola's own ":root[data-theme] .palette-x" and wins by coming
+   later in the cascade, so a theme overrides the page's light/dark. */
+
+[data-example-theme="light"] {
+    color-scheme: light;
+    --palette-state-shift: -0.1;
+    --gl-font: var(--font-sans);
+    --gl-font-size: 0.8125rem;
+    --gl-item-padding: 0.75rem;
+    --gl-radius: 8px;
+    --gl-border: 1px;
+    --gl-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
+    --gl-lift-shadow: 0 12px 28px oklch(0 0 0 / 0.16);
+    --gl-handle-size: 14px;
+    --gl-placeholder-style: dashed;
+    --gl-placeholder-width: 2px;
+    --gl-focus-width: 2px;
+    --gl-title-weight: 600;
+    --gl-title-transform: none;
+    --gl-title-tracking: 0;
+    --gl-motion: 160ms;
+}
+
+:root [data-example-theme="light"] .palette-surface,
+:root [data-example-theme="light"].palette-surface {
+    --palette-base: oklch(0.96 0.003 250);
+    --palette-soft: oklch(0.93 0.004 250);
+    --palette-line: oklch(0.86 0.004 250);
+    --palette-contrast: oklch(0.15 0.01 250);
+    --palette-accent: oklch(0.3 0.01 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-raised,
+:root [data-example-theme="light"].palette-raised {
+    --palette-base: oklch(1 0 0);
+    --palette-soft: oklch(0.955 0.004 250);
+    --palette-line: oklch(0.87 0.005 250);
+    --palette-contrast: oklch(0.15 0.01 250);
+    --palette-accent: oklch(0.28 0.01 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-blue,
+:root [data-example-theme="light"].palette-blue {
+    --palette-base: oklch(0.55 0.2 250);
+    --palette-soft: oklch(0.94 0.06 250);
+    --palette-line: oklch(0.85 0.08 250);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-orange,
+:root [data-example-theme="light"].palette-orange {
+    --palette-base: oklch(0.68 0.17 55);
+    --palette-soft: oklch(0.94 0.08 70);
+    --palette-line: oklch(0.85 0.12 70);
+    --palette-contrast: oklch(0.2 0.05 55);
+    --palette-accent: oklch(0.45 0.15 55);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-green,
+:root [data-example-theme="light"].palette-green {
+    --palette-base: oklch(0.52 0.16 150);
+    --palette-soft: oklch(0.94 0.07 150);
+    --palette-line: oklch(0.85 0.1 150);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.42 0.14 150);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-danger,
+:root [data-example-theme="light"].palette-danger {
+    --palette-base: oklch(0.55 0.2 25);
+    --palette-soft: oklch(0.94 0.07 25);
+    --palette-line: oklch(0.85 0.1 25);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 25);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-purple,
+:root [data-example-theme="light"].palette-purple {
+    --palette-base: oklch(0.55 0.2 300);
+    --palette-soft: oklch(0.94 0.06 300);
+    --palette-line: oklch(0.85 0.08 300);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 300);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] [class*="palette-"],
+:root [data-example-theme="light"][class*="palette-"] {
+    --gl-canvas-bg: var(--palette-soft);
+    --gl-item-line: var(--palette-line);
+    --gl-placeholder-bg: oklch(from oklch(0.55 0.2 250) l c h / 0.14);
+    --gl-placeholder-line: oklch(0.55 0.2 250);
+    --gl-handle-color: oklch(from var(--palette-contrast) l c h / 0.45);
+    --gl-focus-line: oklch(0.55 0.2 250);
+}
