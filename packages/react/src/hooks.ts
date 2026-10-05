@@ -423,23 +423,29 @@ export function useBreakpoint(
     gridLayoutRef?: GridLayoutRef,
 ): BreakpointInfo | undefined {
     const grid = useGrid("useBreakpoint", gridLayoutRef);
-    const view = useViewOf(grid);
-    const name = view?.breakpoint;
-    const width = view?.width ?? 0;
-    const measuredCols = view?.geometry?.cols;
-    // a new object only when one of the three changes
-    return useMemo(
-        () =>
-            grid && name !== undefined
-                ? {
-                      breakpoint: name,
-                      cols:
-                          measuredCols ??
-                          grid.model.get("cols-by", { breakpoint: name }) ??
-                          grid.model.get("cols"),
-                      width,
-                  }
-                : undefined,
-        [grid, name, width, measuredCols],
+    const engine = grid?.engine;
+    // only these three: a gesture's preview changes elsewhere render nothing here
+    const keyNow = () => {
+        const view = engine?.adapter.getView();
+        return view
+            ? `${view.breakpoint}\u0000${view.geometry?.cols ?? ""}\u0000${view.width}`
+            : "";
+    };
+    const key = useSyncExternalStore(
+        engine ? engine.adapter.subscribe : noSubscription,
+        keyNow,
+        keyNow,
     );
+    return useMemo(() => {
+        if (!grid || key === "") return undefined;
+        const [name = "", cols, width] = key.split("\u0000");
+        return {
+            breakpoint: name,
+            cols:
+                Number(cols) ||
+                grid.model.get("cols-by", { breakpoint: name }) ||
+                grid.model.get("cols"),
+            width: Number(width),
+        };
+    }, [grid, key]);
 }

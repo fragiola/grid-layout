@@ -121,8 +121,6 @@ export interface ItemState {
     readonly grabbed: boolean;
     /** a pointer holds it off the grid: released there, it stays where it was */
     readonly outside: boolean;
-    /** a touch holds it, not yet long enough to drag it (R5) */
-    readonly pressing: boolean;
     readonly static: boolean;
     /** people may drag it now (the grid's and its own setting) */
     readonly draggable: boolean;
@@ -153,7 +151,6 @@ export function itemPart(
         resizing: gesture?.kind === "resize",
         grabbed: gesture?.kind === "keyboard",
         outside: gesture?.outside === true,
-        pressing: view.pressing === itemId,
         static: isStatic,
         draggable:
             view.draggable &&
@@ -182,7 +179,6 @@ export function itemPart(
                 "data-resizing": state.resizing,
                 "data-grabbed": state.grabbed,
                 "data-outside": state.outside,
-                "data-pressing": state.pressing,
                 "data-static": state.static,
                 "data-draggable": state.draggable,
                 "data-resizable": state.resizable,

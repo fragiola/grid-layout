@@ -24,7 +24,7 @@ import { valueAt } from "../layout/responsive";
 import type { GridRect, Layout, LayoutItem, ResizeSide } from "../layout/types";
 import { rulesOf } from "../model/model";
 import type { GridLayoutModel } from "../model/types";
-import { DRAG_EXEMPT, PART_ATTRIBUTE } from "./dom";
+import { DRAG_EXEMPT, PART_ATTRIBUTE, PRESSING_ATTRIBUTE } from "./dom";
 import type {
     Direction,
     DropItem,
@@ -247,8 +247,6 @@ export function createGridLayoutEngine(
     let press: Press | undefined;
     /** a native drag over the root: how deep it is in the root's elements, and the app's answer */
     let native: { depth: number; answer: ExternalDragAnswer } | undefined;
-    /** the item a touch holds before it drags (R5) */
-    let pressing: string | undefined;
     /** the item a keyboard drop added: focused once its element is registered */
     let focusNext: string | undefined;
     /** ids made without `crypto.randomUUID` (an insecure context) */
@@ -296,9 +294,7 @@ export function createGridLayoutEngine(
         if (width <= 0) return undefined;
         // each value the active breakpoint's, when it is given per breakpoint (R4)
         const { breakpoint } = model.state;
-        const gap = valueAt(settings.gap, breakpoint, isPair, [
-            10, 10,
-        ] as const);
+        const gap = valueAt(settings.gap, breakpoint, isPair, DEFAULT_GAP);
         return {
             width,
             cols: model.state.cols,
@@ -315,6 +311,8 @@ export function createGridLayoutEngine(
 
     // ─── the breakpoint ─────────────────────────────────────────────────────────────────────
 
+    /** a breakpoint change that waited for the gesture to end */
+    let breakpointWaits = false;
     /** the breakpoint the width gave last, and the threshold the measured width crossed to it */
     let resolved: string | undefined;
     let crossed: { from: string; threshold: number } | undefined;
@@ -356,6 +354,11 @@ export function createGridLayoutEngine(
 
     /** Makes the controlled breakpoint, else a new one the width gives, the model's active one. */
     function resolveBreakpoint(): void {
+        // never under a gesture (a scrollbar its preview brings): once it ends
+        if (session) {
+            breakpointWaits = true;
+            return;
+        }
         const wanted = settings.breakpoint ?? fromWidth();
         if (
             wanted === undefined ||
@@ -398,7 +401,6 @@ export function createGridLayoutEngine(
             rects,
             gesture: session?.view,
             handled,
-            pressing,
             draggable: settings.draggable,
             resizable: settings.resizable,
             dropRefused:
@@ -430,7 +432,6 @@ export function createGridLayoutEngine(
             a.layout === b.layout &&
             a.gesture === b.gesture &&
             a.handled === b.handled &&
-            a.pressing === b.pressing &&
             a.draggable === b.draggable &&
             a.resizable === b.resizable &&
             a.dropRefused === b.dropRefused &&
@@ -746,6 +747,10 @@ export function createGridLayoutEngine(
         session = undefined;
         pointerAt = undefined;
         update();
+        if (breakpointWaits) {
+            breakpointWaits = false;
+            resolveBreakpoint();
+        }
         // the item the engine moved goes back to the view's box (React's props may not change)
         const rect = view.rects[current.itemId];
         if (current.element && rect && drawn(current)) {
@@ -994,15 +999,11 @@ export function createGridLayoutEngine(
         ) {
             const style = host?.getComputedStyle(element);
             const overflow = axis === "y" ? style?.overflowY : style?.overflowX;
-            const room =
-                axis === "y"
-                    ? element.scrollHeight > element.clientHeight
-                    : element.scrollWidth > element.clientWidth;
+            // by its style, room or not yet: a grid growing under a gesture makes room
             if (
-                room &&
-                (overflow === "auto" ||
-                    overflow === "scroll" ||
-                    overflow === "overlay")
+                overflow === "auto" ||
+                overflow === "scroll" ||
+                overflow === "overlay"
             ) {
                 return element;
             }
@@ -1070,22 +1071,24 @@ export function createGridLayoutEngine(
         const scroller = current.scrollers?.[axis];
         if (!root || !at || !scroller) return 0;
         const box = visibleBox(scroller, root.ownerDocument);
-        const grid = root.getBoundingClientRect();
-        const [step, before, after] =
+        const step =
             axis === "y"
-                ? [
-                      edgeStep(at.clientY, box.top, box.bottom),
-                      grid.top < box.top,
-                      grid.bottom +
+                ? edgeStep(at.clientY, box.top, box.bottom)
+                : edgeStep(at.clientX, box.left, box.right);
+        // out of the zones (most frames): nothing more to read
+        if (step === 0) return 0;
+        const grid = root.getBoundingClientRect();
+        const hidden =
+            axis === "y"
+                ? step < 0
+                    ? grid.top < box.top
+                    : grid.bottom +
                           (settings.autoSize ? reachBelow(current) : 0) >
-                          box.bottom,
-                  ]
-                : [
-                      edgeStep(at.clientX, box.left, box.right),
-                      grid.left < box.left,
-                      grid.right > box.right,
-                  ];
-        return (step < 0 && before) || (step > 0 && after) ? step : 0;
+                      box.bottom
+                : step < 0
+                  ? grid.left < box.left
+                  : grid.right > box.right;
+        return hidden ? step : 0;
     }
 
     /** Scrolls `scroller` by `delta` along `axis` at once; says whether it moved. */
@@ -1151,11 +1154,8 @@ export function createGridLayoutEngine(
     }
 
     /** What a touch holding an item stops: a long press's menu and text selection. */
-    function holdTouch(doc: Document): (() => void)[] {
-        return [
-            listen(doc, "contextmenu", (menu) => menu.preventDefault()),
-            listen(doc, "selectstart", (select) => select.preventDefault()),
-        ];
+    function holdTouch(doc: Document): () => void {
+        return listen(doc, "contextmenu", (menu) => menu.preventDefault());
     }
 
     /**
@@ -1244,7 +1244,7 @@ export function createGridLayoutEngine(
         // a touch drag is not a page scroll (the root's touchmove guard) and opens no menu
         if (event.pointerType === "touch") {
             current.touch = true;
-            current.cleanup.push(...holdTouch(doc));
+            current.cleanup.push(holdTouch(doc));
         }
         emit(type, current, event);
         current.pending = event;
@@ -1308,9 +1308,11 @@ export function createGridLayoutEngine(
         };
         press = down;
         if (heldItem !== undefined && host) {
-            // a touch on an item's body: held long enough, it drags from where it is (R5)
-            pressing = heldItem;
-            update();
+            // a touch on an item's body: held long enough, it drags from where it is (R5). The
+            // hold is shown on the item's own element: a touch that turns out a scroll renders
+            // nothing
+            const held = items.get(heldItem);
+            held?.setAttribute(PRESSING_ATTRIBUTE, "");
             const timer = host.setTimeout(() => {
                 if (press !== down) return;
                 endPress();
@@ -1318,11 +1320,9 @@ export function createGridLayoutEngine(
             }, settings.touchDelay);
             down.cleanup.push(
                 () => host.clearTimeout(timer),
-                ...holdTouch(doc),
-                () => {
-                    pressing = undefined;
-                    update();
-                },
+                holdTouch(doc),
+                listen(doc, "selectstart", (select) => select.preventDefault()),
+                () => held?.removeAttribute(PRESSING_ATTRIBUTE),
             );
         }
         down.cleanup.push(

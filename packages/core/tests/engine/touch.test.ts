@@ -28,8 +28,9 @@ describe("a touch on an item's body", () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
         const grid = setup(two());
         const press = pointer(grid.item("a"), 20, 20, touch);
-        expect(grid.view().pressing).toBe("a");
-        expect(itemPart(grid.view(), "a").attributes).toHaveProperty(
+        // shown on the item's own element: no new view while a touch might be a scroll
+        expect(grid.item("a").hasAttribute("data-pressing")).toBe(true);
+        expect(itemPart(grid.view(), "a").attributes).not.toHaveProperty(
             "data-pressing",
         );
         expect(grid.view().gesture).toBeUndefined();
@@ -37,7 +38,7 @@ describe("a touch on an item's body", () => {
         press.moveOnly(23, 22);
         vi.advanceTimersByTime(250);
         flush();
-        expect(grid.view().pressing).toBeUndefined();
+        expect(grid.item("a").hasAttribute("data-pressing")).toBe(false);
         expect(grid.view().gesture?.kind).toBe("move");
         expect(grid.events[0]?.type).toBe("drag-start");
         press.move(20 + (1190 / 12) * 4, 20);
@@ -52,7 +53,7 @@ describe("a touch on an item's body", () => {
         const grid = setup(two());
         const press = pointer(grid.item("a"), 20, 20, touch);
         press.moveOnly(20, 40);
-        expect(grid.view().pressing).toBeUndefined();
+        expect(grid.item("a").hasAttribute("data-pressing")).toBe(false);
         vi.advanceTimersByTime(500);
         flush();
         expect(grid.view().gesture).toBeUndefined();
@@ -66,7 +67,7 @@ describe("a touch on an item's body", () => {
         press.release(20, 20);
         vi.advanceTimersByTime(500);
         expect(grid.view().gesture).toBeUndefined();
-        expect(grid.view().pressing).toBeUndefined();
+        expect(grid.item("a").hasAttribute("data-pressing")).toBe(false);
     });
 
     it("keeps the page from scrolling once it drags, never before", () => {
@@ -106,7 +107,7 @@ describe("what never waits", () => {
         const grid = setup(two());
         const handle = grid.dragHandle("a");
         const press = pointer(handle, 20, 20, touch);
-        expect(grid.view().pressing).toBeUndefined();
+        expect(grid.item("a").hasAttribute("data-pressing")).toBe(false);
         press.move(60, 20);
         expect(grid.view().gesture?.kind).toBe("move");
         press.release(60, 20);

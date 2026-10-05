@@ -164,7 +164,9 @@ function targetOf(
 ): Target | CommandFailure {
     const name = breakpoint ?? state.breakpoint;
     knownBreakpoint(state, name);
-    const layout = state.layouts[name];
+    // the active one without a layout (its generation refused) is empty: commands make one
+    const layout =
+        state.layouts[name] ?? (name === state.breakpoint ? [] : undefined);
     if (!layout) {
         return fail("not_found", `breakpoint "${name}" has no layout yet`);
     }
@@ -580,11 +582,14 @@ const handlers: Handlers = {
             settings.breakpoints === undefined
                 ? state.breakpoints
                 : checkBreakpoints(settings.breakpoints);
-        // the active breakpoint gone: the widest one becomes active (the engine then picks the
-        // width's), its layout generated from the one that goes
+        // the active breakpoint gone: the one the settings name (the width's, from an adapter),
+        // else the widest, becomes active, its layout generated from the one that goes
         const active = Object.hasOwn(breakpoints, state.breakpoint)
             ? state.breakpoint
-            : (sortBreakpoints(breakpoints).at(-1) ?? state.breakpoint);
+            : settings.breakpoint !== undefined &&
+                Object.hasOwn(breakpoints, settings.breakpoint)
+              ? settings.breakpoint
+              : (sortBreakpoints(breakpoints).at(-1) ?? state.breakpoint);
         const columns = columnsFor(
             breakpoints,
             settings.cols ?? keptColumns(state, breakpoints),

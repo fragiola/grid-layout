@@ -28,8 +28,7 @@ export const item = (state: ItemState) =>
         !state.dragging &&
             !state.resizing &&
             "transition-[transform,width,height,scale] duration-(--gl-motion)",
-        state.pressing &&
-            "scale-[0.97] outline-(length:--gl-focus-width) outline-(--gl-focus-line)",
+        "data-pressing:scale-[0.97] data-pressing:outline-(length:--gl-focus-width) data-pressing:outline-(--gl-focus-line)",
         state.dragging && "shadow-(--gl-lift-shadow)",
     );
 

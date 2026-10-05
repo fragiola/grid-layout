@@ -5,6 +5,7 @@ export {
     ITEM_ATTRIBUTE,
     NO_DRAG_ATTRIBUTE,
     PART_ATTRIBUTE,
+    PRESSING_ATTRIBUTE,
 } from "./engine/dom";
 export { createGridLayoutEngine } from "./engine/engine";
 export {

@@ -25,7 +25,7 @@ export const item = (state: ItemState) =>
         // the others tilt (odd one way, even the other), the moving one never
         !state.dragging &&
             "transition-[transform,rotate,scale] duration-(--gl-motion) group-data-dragging:odd:rotate-2 group-data-dragging:even:-rotate-2",
-        state.pressing && "scale-90",
+        "data-pressing:scale-90",
         state.dragging && "scale-110",
     );
 

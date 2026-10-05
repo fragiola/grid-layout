@@ -80,8 +80,13 @@ export type GridSettings = Partial<
 > & {
     /** the columns, for every breakpoint or each one */
     readonly cols?: number | Readonly<Record<string, number>> | undefined;
-    /** each breakpoint's minimum width; the active one gone, the widest becomes active */
+    /** each breakpoint's minimum width; the active one gone, `breakpoint` (else the widest) */
     readonly breakpoints?: Breakpoints | undefined;
+    /**
+     * the breakpoint to make active if `breakpoints` drops the active one (an adapter gives the
+     * one its width would)
+     */
+    readonly breakpoint?: string | undefined;
 };
 
 /** The breakpoint a command edits: the active one unless it names another. */

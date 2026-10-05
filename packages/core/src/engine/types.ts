@@ -161,8 +161,6 @@ export interface GridLayoutView {
     readonly gesture: GestureView | undefined;
     /** the items that have a drag handle: they drag only from it, and it is their tab stop */
     readonly handled: ReadonlySet<string>;
-    /** the item a touch holds before it drags (R5): its `data-pressing` */
-    readonly pressing: string | undefined;
     /** whether people may drag and resize at all (the options) */
     readonly draggable: boolean;
     readonly resizable: boolean;

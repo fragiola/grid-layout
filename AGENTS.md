@@ -164,7 +164,10 @@ an implementation detail.
     per breakpoint (one implicit `default` breakpoint without them). Commands `breakpoint.set`,
     `layouts.set`, `layouts.generate`; `item.*` and `layout.set` take an optional `breakpoint`;
     queries `cols`, `cols-by`, `layout-by`, `breakpoints`, `breakpoint-for`.
-    `onLayoutChange(layout, layouts)` keeps its first argument and adds every breakpoint's.
+    `onLayoutChange(layout, layouts)` keeps its first argument and adds every breakpoint's; it is
+    also told when the breakpoint changes (the active layout is another), never on mount for a
+    breakpoint change alone (`onBreakpointChange` tells that). A breakpoint change waits for a
+    gesture to end.
 23. **Generation (R3).** A breakpoint without a layout, made active, gets one right after as a
     command of its own (`layouts.generate`, middleware and `onLayoutChange` see it): the nearest
     larger breakpoint's layout, else the last active one's, settled in its columns (gaps
@@ -174,7 +177,9 @@ an implementation detail.
 24. **Geometry per breakpoint (R4).** `gap`, `padding` and `rowHeight` take one value or one per
     breakpoint; they are engine options, never stored in the model.
 25. **Touch activation (R5).** A touch on an item's **body** is held `touchDelay` (250 ms) within
-    `touchTolerance` (5 px) before it drags, `data-pressing` on the item meanwhile; a touch that
+    `touchTolerance` (5 px) before it drags, `data-pressing` on the item meanwhile (written by the
+    engine on the item's element, not through the view, so a touch that turns out a scroll
+    renders nothing; style it with CSS, there is no state field); a touch that
     moves first is let go, so the page scrolls. Handles, resize handles and drag sources start at
     once (structural `touch-action: none`); item bodies get no `touch-action`. A touch that holds
     an item never scrolls the page (a non-passive `touchmove` guard on the root) and opens no
@@ -319,7 +324,7 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
     element's `dir`. It takes `gridLayoutRef`, `onExternalDrag`, `onDrop` and `createId`.
   - `Item` (`useItem`): placed by a `transform`; `data-item-id`, `data-dragging`,
     `data-resizing`, `data-grabbed`, `data-outside`, `data-pressing` (a touch holds it before it
-    drags), `data-static`, `data-draggable`, `data-resizable`. It is the
+    drags; set by the engine on the element), `data-static`, `data-draggable`, `data-resizable`. It is the
     tab stop (`tabIndex` 0), or `-1` once it has a drag handle.
   - `DragHandle` (`useDragHandle`): the only place its item drags from once there is one, and the
     item's tab stop; `data-dragging`, `data-grabbed`, `data-draggable`.

@@ -3,6 +3,7 @@
 
 import {
     type Breakpoints,
+    breakpointFor,
     type Compactor,
     createGridLayoutEngine,
     createGridLayoutModel,
@@ -374,7 +375,8 @@ export function Root(props: RootProps) {
                   return start === undefined || !sameLayout(start, settled);
               })
             : !sameLayout(given.layout ?? [], model.get("layout"));
-        if (corrected || moved) tell();
+        // a breakpoint change alone is not a layout change on mount: onBreakpointChange tells it
+        if (corrected) tell();
         return unsubscribe;
     }, [model, given]);
 
@@ -399,9 +401,12 @@ export function Root(props: RootProps) {
     const stableBreakpoints = useStable(breakpoints ?? ONE_BREAKPOINT);
     const stableCols = useStable(cols ?? 12);
     useLayoutEffect(() => {
+        // when the breakpoints drop the active one: the one the grid's width gives, in one step
+        const width = engine.get("geometry")?.width ?? 0;
         const result = model.run("grid.configure", {
             settings: {
                 breakpoints: stableBreakpoints,
+                breakpoint: breakpointFor(stableBreakpoints, width),
                 cols: stableCols,
                 maxRows: maxRows ?? Number.POSITIVE_INFINITY,
                 compactor: compactor ?? verticalCompactor,
@@ -415,6 +420,7 @@ export function Root(props: RootProps) {
         }
     }, [
         model,
+        engine,
         stableBreakpoints,
         stableCols,
         maxRows,

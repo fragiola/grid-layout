@@ -154,14 +154,17 @@ describe("the breakpoint", () => {
         });
     });
 
-    it("ends a gesture when the breakpoint changes under it", () => {
+    it("waits for a gesture to end before it changes the breakpoint", () => {
         const grid = setup(responsive());
         const press = pointer(grid.item("a"), 20, 20);
         press.move(300, 20);
-        expect(grid.view().gesture).toBeDefined();
+        // a scrollbar the drag's preview brought: the gesture goes on, at lg
         grid.resizeTo(800);
-        expect(grid.view().gesture).toBeUndefined();
-        expect(grid.events.at(-1)?.type).toBe("cancel");
+        expect(grid.view().gesture).toBeDefined();
+        expect(grid.model.get("breakpoint")).toBe("lg");
+        press.release(300, 20);
+        expect(grid.events.at(-1)?.type).toBe("drag-stop");
+        expect(grid.model.get("breakpoint")).toBe("sm");
     });
 
     it("never switches a grid without breakpoints", () => {

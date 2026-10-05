@@ -27,7 +27,7 @@ export const item = (state: ItemState) =>
         "outline-none focus-visible:outline-(length:--gl-focus-width) focus-visible:outline-(--gl-focus-line) focus-visible:outline-offset-2",
         !state.dragging &&
             "transition-[transform,width,height,scale] duration-(--gl-motion)",
-        state.pressing && "scale-[0.97]",
+        "data-pressing:scale-[0.97]",
         state.dragging && "shadow-(--gl-lift-shadow)",
     );
 

@@ -39,7 +39,6 @@ function view(over: Partial<GridLayoutView> = {}): GridLayoutView {
         },
         gesture: undefined,
         handled: new Set(),
-        pressing: undefined,
         dropRefused: false,
         draggable: true,
         resizable: true,

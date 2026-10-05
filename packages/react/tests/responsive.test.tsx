@@ -195,6 +195,47 @@ describe("a responsive root", () => {
         expect(b).toMatch(/translate\(\d+px, [1-9]\d+px\)/);
     });
 
+    it("switches once, to the width's, when new breakpoints drop the active one", () => {
+        const onBreakpointChange = vi.fn();
+        const { rerender } = render(
+            <Grid
+                defaultLayouts={{ lg: LG }}
+                onBreakpointChange={onBreakpointChange}
+            />,
+        );
+        rerender(
+            <Grid
+                defaultLayouts={{ lg: LG }}
+                breakpoints={{ desktop: 900, phone: 0 }}
+                cols={{ desktop: 12, phone: 4 }}
+                onBreakpointChange={onBreakpointChange}
+            />,
+        );
+        expect(onBreakpointChange).toHaveBeenCalledTimes(1);
+        expect(onBreakpointChange).toHaveBeenCalledWith("desktop", 12);
+    });
+
+    it("tells no layout change on mount for a breakpoint alone", () => {
+        const onLayoutChange = vi.fn();
+        const onBreakpointChange = vi.fn();
+        render(
+            <Grid
+                width={600}
+                defaultLayouts={{
+                    lg: LG,
+                    sm: [
+                        { id: "a", x: 0, y: 0, w: 4, h: 2 },
+                        { id: "b", x: 0, y: 2, w: 6, h: 2 },
+                    ],
+                }}
+                onLayoutChange={onLayoutChange}
+                onBreakpointChange={onBreakpointChange}
+            />,
+        );
+        expect(onBreakpointChange).toHaveBeenCalledWith("sm", 6);
+        expect(onLayoutChange).not.toHaveBeenCalled();
+    });
+
     it("tells the breakpoint the first measure gives", () => {
         const onBreakpointChange = vi.fn();
         render(
