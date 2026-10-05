@@ -6,8 +6,18 @@ export {
     type GridLayoutContextValue,
 } from "./context";
 export {
+    createGridLayoutRef,
+    type GridLayoutRef,
+    useGridLayoutRef,
+} from "./gridLayoutRef";
+export {
+    type DragSourceHookResult,
+    type DragSourceOptions,
+    type DropDetails,
     type PartHookResult,
     useDragHandle,
+    useDragPreview,
+    useDragSource,
     useGesture,
     useGridLayout,
     useGridLayoutEvents,
@@ -21,6 +31,10 @@ export * as GridLayout from "./parts";
 export {
     DragHandle,
     type DragHandleProps,
+    DragPreview,
+    type DragPreviewProps,
+    DragSource,
+    type DragSourceProps,
     Item,
     type ItemProps,
     Items,

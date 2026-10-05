@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>External drop fixture</title>
+        <style>
+            /* the fixture's own few lines: a sidebar beside the grid, a trash, a page to read */
+            /* room around the grid: a pointer can leave the root and stay on the page */
+            body { margin: 0; padding: 120px 40px 40px; font: 13px/1.2 system-ui, sans-serif; }
+            .page { display: flex; gap: 40px; align-items: flex-start; }
+            aside { display: flex; flex-direction: column; gap: 10px; width: 160px; flex: none; }
+            /* what the page prints never moves the grid */
+            pre { width: 960px; white-space: pre-wrap; overflow-wrap: anywhere; }
+            [data-grid-layout-part="drag-source"] { height: 30px; outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="drag-source"]:focus-visible { outline: 2px solid #06c; }
+            [data-testid="trash"] { height: 80px; outline: 1px dashed #c00; }
+            [data-grid-layout-part="root"] { width: 960px; min-height: 160px; outline: 1px solid #ccc; }
+            [data-grid-layout-part="root"][data-drop-refused] { outline-color: #c00; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+            [data-grid-layout-part="drag-preview"] { width: 60px; height: 24px; background: #06c; color: #fff; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountExternalFixture } from "../../src/fixture/external-fixture.tsx";
+            mountExternalFixture();
+        </script>
+    </body>
+</html>

@@ -72,3 +72,49 @@ export async function drag(
     );
     if (options.release !== false) await page.mouse.up();
 }
+
+/** The external drop fixture's page for a direction. */
+export function externalFixture(dir: Dir): string {
+    return `/fixtures/external/${dir === "rtl" ? "?dir=rtl" : ""}`;
+}
+
+/** The viewport point at the centre of a box of the grid, in cells: where a drop puts it there. */
+export async function cellCentre(
+    page: Page,
+    dir: Dir,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+): Promise<{ x: number; y: number }> {
+    const root = await page.getByTestId("grid").boundingBox();
+    expect(root).not.toBeNull();
+    const inline = 10 + STEP_X * x + (w * STEP_X - 10) / 2;
+    return {
+        x:
+            dir === "rtl"
+                ? (root?.x ?? 0) + (root?.width ?? 0) - inline
+                : (root?.x ?? 0) + inline,
+        y: (root?.y ?? 0) + 10 + STEP_Y * y + (h * STEP_Y - 10) / 2,
+    };
+}
+
+/** Presses at `from` with the mouse and moves to `to` in steps, then releases unless told not to. */
+export async function dragTo(
+    page: Page,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    options: { release?: boolean } = {},
+): Promise<void> {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 10 });
+    if (options.release !== false) await page.mouse.up();
+}
+
+/** A layout's boxes by position, ids aside (a drop's preview holds a stand-in id). */
+export function shapes(layout: readonly Box[]) {
+    return layout
+        .map(({ x, y, w, h }) => ({ x, y, w, h }))
+        .sort((p, q) => p.y - q.y || p.x - q.x);
+}

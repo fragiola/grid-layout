@@ -114,6 +114,36 @@ describe("a drop from a drag source, by pointer", () => {
         expect(grid.view().gesture).toBeUndefined();
     });
 
+    it("tells the source each event came from", () => {
+        const grid = setup(two());
+        const source = grid.source({ item: { w: 1, h: 1 } });
+        const press = pointer(source, 1300, 20);
+        press.move(...centre(grid, 5, 0, 1, 1));
+        press.release(...centre(grid, 5, 0, 1, 1));
+        expect(grid.events.map((event) => event.origin)).toEqual(
+            grid.events.map(() => source),
+        );
+    });
+
+    it("keeps its press when it sits inside an item", () => {
+        const grid = setup(two());
+        const inner = grid.child("a");
+        inner.addEventListener("pointerdown", (event) =>
+            grid.engine.adapter.startExternalDrag(event, inner, {
+                item: { w: 1, h: 1 },
+            }),
+        );
+        const press = pointer(inner, 20, 20);
+        press.move(...centre(grid, 6, 0, 1, 1));
+        expect(grid.view().gesture?.kind).toBe("drop");
+        press.release(...centre(grid, 6, 0, 1, 1));
+        expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
+            x: 0,
+            y: 0,
+        });
+        expect(grid.model.get("layout")).toHaveLength(3);
+    });
+
     it("stays a click under the threshold", () => {
         const grid = setup(two());
         const source = grid.source({ item: { w: 1, h: 1 } });
@@ -536,6 +566,19 @@ describe("a native drag from another window", () => {
             item: { x: 6, y: 0, w: 2, h: 1 },
         });
         expect(grid.view().gesture).toBeUndefined();
+    });
+
+    it("leaves a drag over a grid nested in an item to that grid", () => {
+        const { grid, onExternalDrag } = native(() => ({ w: 1, h: 1 }));
+        const nested = grid.child("a");
+        nested.setAttribute("data-grid-layout-part", "root");
+        const inner = document.createElement("div");
+        nested.append(inner);
+        const enter = nativeDrag(inner, "dragenter", 20, 20);
+        nativeDrag(inner, "drop", 20, 20);
+        expect(enter.defaultPrevented).toBe(false);
+        expect(onExternalDrag).not.toHaveBeenCalled();
+        expect(grid.model.get("layout")).toHaveLength(2);
     });
 
     it("restores the layout when the drag leaves", () => {

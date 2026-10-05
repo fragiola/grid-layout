@@ -418,6 +418,7 @@ export function createGridLayoutEngine(
             data: current.data,
             outside: current.outside,
             target: ended?.target ?? null,
+            origin: current.origin,
         };
         for (const listener of [...gestureListeners]) listener(event);
     }
@@ -1051,6 +1052,8 @@ export function createGridLayoutEngine(
     function pointerdown(event: PointerEvent): void {
         if (event.defaultPrevented || event.button !== 0 || session || !root)
             return;
+        // a drag source inside the grid (in an item) already took this press
+        if (press?.pointerId === event.pointerId) return;
         const element = event.target as Element | null;
         if (!element || typeof element.closest !== "function") return;
         // a press inside a grid nested in an item belongs to that grid
@@ -1215,8 +1218,18 @@ export function createGridLayoutEngine(
         answerNative(event, answer);
     }
 
+    /** A native drag event on this grid's own elements, not on a grid nested in an item. */
+    function own(event: DragEvent): boolean {
+        const target = event.target as Element | null;
+        return (
+            root !== undefined &&
+            typeof target?.closest === "function" &&
+            target.closest(`[${PART_ATTRIBUTE}="root"]`) === root
+        );
+    }
+
     function dragenter(event: DragEvent): void {
-        if (!root) return;
+        if (!own(event)) return;
         if (!native) {
             enterNative(event);
             return;
@@ -1226,7 +1239,7 @@ export function createGridLayoutEngine(
     }
 
     function dragover(event: DragEvent): void {
-        if (!root) return;
+        if (!root || !own(event)) return;
         // a drag over before its enter (dispatched alone, or entered while a gesture ran)
         if (!native) {
             enterNative(event);
@@ -1247,7 +1260,7 @@ export function createGridLayoutEngine(
     }
 
     function dragleave(event: DragEvent): void {
-        if (!native) return;
+        if (!native || !own(event)) return;
         native.depth--;
         if (native.depth > 0) return;
         native = undefined;
@@ -1256,7 +1269,7 @@ export function createGridLayoutEngine(
     }
 
     function drop(event: DragEvent): void {
-        if (!native) return;
+        if (!native || !own(event)) return;
         const { answer } = native;
         native = undefined;
         const current = session;

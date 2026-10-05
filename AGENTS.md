@@ -110,6 +110,46 @@ an implementation detail.
 14. **App policy stays in the app (D14).** Persistence, toolboxes, add and remove UI, undo, ids,
     announcement text and widget content belong to the examples (`_kit`), never to a package.
 
+### External drop (Epic #9)
+
+15. **Pointer sources, and native drags for foreign content (X1).** `GridLayout.DragSource`
+    (`useDragSource`) is pointer-based: the engine owns its session (threshold, capture on the
+    source, frames, Escape, cancel) through the root's document, as an internal move. It gives
+    `item: { w, h, minW?, maxW?, minH?, maxH? }`, an optional `itemId`, opaque `data` and a
+    `dragOffset`. **No HTML5 drag and drop for sources** (no touch). Native drags from other
+    windows (files, links, text) go through the root's `dragenter`/`dragover`/`dragleave`/`drop`
+    with an enter/leave counter, answered by `onExternalDrag(event)`: `{ w, h, data? }` accepts,
+    `false` refuses (`data-drop-refused`), `undefined` lets it pass; asked again on the drop, when
+    the files can be read (that answer can refuse and gives the data; the size stays the shown
+    one). The drag image is the app's: `GridLayout.DragPreview`, kept at the pointer by the engine.
+16. **Preview, then commit (X2).** A drop is a gesture of kind `drop`. Its preview is the model's
+    dry run of `item.add` against the layout at the gesture's start, under a stand-in id no item
+    uses (or the source's `itemId`); it never enters the model nor `onLayoutChange`. The item is
+    centred under the pointer, moved by `dragOffset`, bounded with `bounded`, mirrored in RTL.
+    The drop runs **one** `item.add`, its id the source's `itemId`, else the engine's `createId`
+    option's, else `crypto.randomUUID()` through the root's `defaultView` (D13). Then `onDrop({
+    item, data, layout })`, on the root and on the source.
+17. **Dragging out is reported, never removed (X3).** Once a held item's centre leaves the root
+    (past its sides or top, or further below its bottom than its own height with `autoSize`),
+    `data-outside` marks the item and the root and the preview puts it back in its cell. A release
+    there runs **no command**: `onDragStop` gets `outside: true` and `target` (the element under
+    the pointer, past the held item). Removing it is the app's (D14). A `bounded` grid never lets
+    an item out.
+18. **The layout stays geometry (X4).** `LayoutItem` has no `data` and no generic: a drop's data
+    travels only in the gesture's events and `onDrop`; the app maps ids to its content.
+19. **`gridLayoutRef` (X5).** `createGridLayoutRef()` / `useGridLayoutRef()` (Data Grid's
+    `createDataGridRef`): `current` is `{ model, engine }` while a `Root` given it as
+    `gridLayoutRef` is mounted, `null` otherwise, and it tells when that changes. Hooks and parts
+    outside the root take it (`useGridLayout(ref)`, `useGridLayoutView(ref)`,
+    `useGridLayoutEvents(listener, ref)`, `DragSource`/`DragPreview`'s `gridLayoutRef`).
+20. **Sources work from the keyboard (X6).** A `DragSource` is a tab stop. Space or Enter on it
+    starts a keyboard gesture of kind `drop`: the new item enters the preview at the first free
+    cell, already grabbed; Arrows move it, Shift+Arrows size it, Space or Enter drops it (one
+    `item.add`) and the focus moves to the new item once it is mounted; Escape, Tab or the focus
+    leaving gives up. Events are D10's (`grab`, `move`, `resize`, `drop`, `cancel`) with
+    `external: true`; pointer and native drops tell `drop-start`, `drop-over`, `drop`,
+    `drop-cancel`. No name and no text in the primitives.
+
 ## Commands
 
 | command | does |
@@ -223,9 +263,10 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
 - **`className` and `style` accept a value or a `(state) => value` function.** Consumer style is
   merged *under* the structural style: structural keys always win.
 - **Structural inline style only** (a component test holds the list): `position`, `top`, `left`,
-  `width`, `height`, `transform` and `box-sizing` place a box; `z-index` keeps a held item above
-  the others; `touch-action: none` makes a handle's touch a drag; `pointer-events: none` keeps the
-  placeholder out of the pointer's way. Nothing cosmetic: transitions, cursors, colours, shadows
+  `width`, `height`, `transform` and `box-sizing` place a box; `z-index` keeps a held item (and the
+  drag preview) above the others; `touch-action: none` makes a handle's and a drag source's touch
+  a drag; `pointer-events: none` keeps the placeholder and the drag preview out of the pointer's
+  way. Nothing cosmetic: transitions, cursors, colours, shadows
   and the handles' look are the app's.
 - **State only through `data-*` and ARIA**, present or absent (never `"false"`). Every part
   carries `data-grid-layout-part`, every item `data-item-id`; e2e selectors use them, never class
@@ -236,10 +277,12 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
   keyed by id.
 - **The parts** (`GridLayout.*`, each over its hook):
   - `Root` (`useGridLayout`, `useGridLayoutView`): a `div` positioned `relative`, as tall as the
-    layout with `autoSize`; `data-dragging`, `data-resizing`, `data-grabbed`. Its `dir` prop is
-    the engine's direction and the element's `dir`.
+    layout with `autoSize`; `data-dragging`, `data-resizing`, `data-grabbed`, `data-dropping`,
+    `data-drop-refused`, `data-outside`. Its `dir` prop is the engine's direction and the
+    element's `dir`. It takes `gridLayoutRef`, `onExternalDrag`, `onDrop` and `createId`.
   - `Item` (`useItem`): placed by a `transform`; `data-item-id`, `data-dragging`,
-    `data-resizing`, `data-grabbed`, `data-static`, `data-draggable`, `data-resizable`. It is the
+    `data-resizing`, `data-grabbed`, `data-outside`, `data-static`, `data-draggable`,
+    `data-resizable`. It is the
     tab stop (`tabIndex` 0), or `-1` once it has a drag handle.
   - `DragHandle` (`useDragHandle`): the only place its item drags from once there is one, and the
     item's tab stop; `data-dragging`, `data-grabbed`, `data-draggable`.
@@ -247,7 +290,15 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
     `data-side`, `data-resizing`; renders nothing while its item cannot be resized. Where it
     sits and how it looks are the app's (the fixtures use logical insets).
   - `Placeholder` (`usePlaceholder`): only during a gesture, at the box the held item would land
-    in; `data-kind` (`move`, `resize`, `keyboard`).
+    in; `data-kind` (`move`, `resize`, `keyboard`, `drop`); a drop shows none off the grid or
+    refused.
+  - `DragSource` (`useDragSource`): anywhere on the page (outside the root through
+    `gridLayoutRef`); a tab stop (`-1` when `disabled`), `touch-action: none`; `data-dragging`,
+    `data-grabbed`, `data-disabled`; its press and keys go to the engine after the app's own.
+  - `DragPreview` (`useDragPreview`): only during a pointer drop, `position: fixed` and kept at
+    the pointer by the engine (its `transform`); `data-over`, `data-drop-refused`; its children
+    (or a function of its state, the drop's `data`) are the app's.
+- **The ref** (`createGridLayoutRef` / `useGridLayoutRef`): one mounted `Root` holds it at a time.
 - **Presses and keys go to the engine after the consumer.** `Root` calls the engine's
   `pointerdown` and `keydown` after the consumer's `onPointerDown`/`onKeyDown` (on `Root` or its
   `render` element): `preventDefault` vetoes a gesture or replaces a key. During a pointer gesture,

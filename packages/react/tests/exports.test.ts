@@ -15,6 +15,8 @@ describe("@fragiola/grid-layout-react", () => {
         expect(Object.keys(react.GridLayout).sort()).toEqual(
             [
                 "DragHandle",
+                "DragPreview",
+                "DragSource",
                 "Item",
                 "Items",
                 "Placeholder",

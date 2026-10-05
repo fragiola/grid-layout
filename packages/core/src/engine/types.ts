@@ -177,6 +177,8 @@ export interface GestureEvent {
     readonly outside: boolean;
     /** a move released off the grid: the element under the pointer (a trash); `null` otherwise */
     readonly target: Element | null;
+    /** the drag source a drop started from (`undefined` for a native drag and the grid's own) */
+    readonly origin: HTMLElement | undefined;
 }
 
 export type GestureListener = (event: GestureEvent) => void;
