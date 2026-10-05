@@ -1,10 +1,13 @@
 # CI: the Fragiola project jobs, with the Playwright suites split out of Checks.
 #
 #   Checks   Biome, TypeScript, the unit tests and the build (with the .d.ts check).
-#   E2E      the Playwright suites, in parallel jobs: the playground (Chromium and Firefox: the
-#            scroll scaling and focus specs run in both) and the examples app. The playground's
-#            dev server serves the packages from source, so its job builds nothing; the examples
-#            suite builds the embed against the packages' dist, so its job builds the packages.
+#   E2E      the Playwright suites, in parallel jobs: the playground (Chromium and Firefox, and
+#            the `mobile` project: Chromium on a phone, real touch input) and the examples app.
+#            The playground's dev server serves the packages from source, so its job builds
+#            nothing; the examples suite builds the embed against the packages' dist, so its job
+#            builds the packages.
+#   E2E (WebKit mobile)  the playground's mobile specs in WebKit on an iPhone's viewport: a
+#            report, never a gate (continue-on-error), as WebKit in CI can be slow or flaky.
 #   Site export       fragiola.com builds /grid-layout from `pnpm site:export` (contract v1.2,
 #                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs
 #                     it: it fails on anything www would reject.
@@ -108,6 +111,42 @@ jobs:
         with:
           name: playwright-report-${{ matrix.id }}
           path: ${{ matrix.dir }}/playwright-report/
+          retention-days: 14
+
+  e2e-webkit:
+    name: E2E (WebKit mobile)
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    # a report, never a gate (Epic #13): WebKit in CI can be slow or flaky
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright WebKit
+        working-directory: apps/playground
+        run: pnpm exec playwright install --with-deps webkit
+
+      - name: Run the mobile specs in WebKit
+        working-directory: apps/playground
+        env:
+          PLAYWRIGHT_WEBKIT: "1"
+        run: pnpm exec playwright test --project webkit-mobile
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-webkit-mobile
+          path: apps/playground/playwright-report/
           retention-days: 14
 
   site-export:

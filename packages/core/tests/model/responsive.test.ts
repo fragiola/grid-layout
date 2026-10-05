@@ -147,9 +147,9 @@ describe("switching breakpoints", () => {
         model.run("item.remove", { itemId: "b" });
         const events = told(model);
         model.run("breakpoint.set", { breakpoint: "sm" });
+        // brought up to date in the same change: one event
         expect(events.map((event) => event.command)).toEqual([
             "breakpoint.set",
-            "layouts.generate",
         ]);
         expect(
             model
@@ -279,11 +279,19 @@ describe("commands at a breakpoint", () => {
             item("a", 0, 0, 4, 1),
         ]);
         expect(model.get("cols")).toBe(12);
+        // the active breakpoint gone: the widest new one, from its layout
+        const moved = createGridLayoutModel({
+            breakpoints: BREAKPOINTS,
+            cols: COLS,
+            layouts: { lg: [item("a", 0, 0, 12, 1)] },
+        });
         expect(
-            model.run("grid.configure", {
-                settings: { breakpoints: { md: 0 } },
-            }),
-        ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
+            moved.run("grid.configure", {
+                settings: { breakpoints: { wide: 0 }, cols: 8 },
+            }).ok,
+        ).toBe(true);
+        expect(moved.get("breakpoint")).toBe("wide");
+        expect(moved.get("layout")).toEqual([item("a", 0, 0, 8, 1)]);
         model.run("grid.configure", {
             settings: {
                 breakpoints: { lg: 900, sm: 0 },

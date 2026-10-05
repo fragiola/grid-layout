@@ -102,9 +102,10 @@ describe("GridLayout.Root", () => {
                 onLayoutChange={onLayoutChange}
             />,
         );
-        expect(onLayoutChange).toHaveBeenCalledWith([
-            { id: "a", x: 10, y: 0, w: 2, h: 2 },
-        ]);
+        expect(onLayoutChange).toHaveBeenCalledWith(
+            [{ id: "a", x: 10, y: 0, w: 2, h: 2 }],
+            { default: expect.any(Array) },
+        );
         expect(onLayoutChange).toHaveBeenCalledTimes(1);
     });
 
@@ -292,9 +293,10 @@ describe("GridLayout.Root", () => {
         rerender(<Grid layout={messy} onLayoutChange={onLayoutChange} />);
         rerender(<Grid layout={messy} onLayoutChange={onLayoutChange} />);
         expect(onLayoutChange).toHaveBeenCalledTimes(1);
-        expect(onLayoutChange).toHaveBeenCalledWith([
-            { id: "a", x: 0, y: 0, w: 2, h: 2 },
-        ]);
+        expect(onLayoutChange).toHaveBeenCalledWith(
+            [{ id: "a", x: 0, y: 0, w: 2, h: 2 }],
+            { default: expect.any(Array) },
+        );
         expect(box("a").style.transform).toBe("translate(10px, 10px)");
     });
 
@@ -327,9 +329,10 @@ describe("GridLayout.Root", () => {
         expect(onLayoutChange).toHaveBeenCalledTimes(1);
         rerender(<Grid layout={messy()} onLayoutChange={onLayoutChange} />);
         expect(onLayoutChange).toHaveBeenCalledTimes(2);
-        expect(onLayoutChange).toHaveBeenLastCalledWith([
-            { id: "a", x: 0, y: 0, w: 2, h: 2 },
-        ]);
+        expect(onLayoutChange).toHaveBeenLastCalledWith(
+            [{ id: "a", x: 0, y: 0, w: 2, h: 2 }],
+            { default: expect.any(Array) },
+        );
     });
 
     it("tells a controlled layout once when a rule re-settles it", () => {

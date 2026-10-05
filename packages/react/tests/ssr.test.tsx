@@ -55,4 +55,16 @@ describe("server rendering", () => {
         expect(html).toContain('tabindex="0"');
         expect(html).not.toContain("drag-preview");
     });
+
+    it("renders a responsive root at its default breakpoint, without a width", () => {
+        const html = renderToString(
+            <GridLayout.Root
+                breakpoints={{ lg: 996, sm: 0 }}
+                cols={{ lg: 12, sm: 6 }}
+                defaultBreakpoint="sm"
+                defaultLayouts={{ sm: layout }}
+            />,
+        );
+        expect(html).toContain('data-breakpoint="sm"');
+    });
 });

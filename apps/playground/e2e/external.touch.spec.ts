@@ -1,9 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { cellCentre, center, DIRS, externalFixture, layoutOf } from "./helpers";
+import {
+    cellCentre,
+    center,
+    DIRS,
+    externalFixture,
+    layoutOf,
+    touchPath,
+} from "./helpers";
 
-// Real touch input (Chromium's, through the DevTools protocol): a drag source takes a touch drag
-// past the threshold, its `touch-action: none` keeping the page from scrolling (X1). The fixture
-// is wider than a phone: the viewport is too.
+// Touch input on a phone: a drag source takes a touch drag past the threshold, its
+// `touch-action: none` keeping the page from scrolling (X1). The fixture is wider than a phone:
+// the viewport is too.
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -12,27 +19,9 @@ for (const dir of DIRS) {
         page,
     }) => {
         await page.goto(externalFixture(dir));
-        const client = await page.context().newCDPSession(page);
         const from = await center(page.getByTestId("source-note"));
         const to = await cellCentre(page, dir, 6, 0, 2, 1);
-        const point = (step: number) => ({
-            x: from.x + ((to.x - from.x) * step) / 10,
-            y: from.y + ((to.y - from.y) * step) / 10,
-        });
-        await client.send("Input.dispatchTouchEvent", {
-            type: "touchStart",
-            touchPoints: [point(0)],
-        });
-        for (let step = 1; step <= 10; step++) {
-            await client.send("Input.dispatchTouchEvent", {
-                type: "touchMove",
-                touchPoints: [point(step)],
-            });
-        }
-        await client.send("Input.dispatchTouchEvent", {
-            type: "touchEnd",
-            touchPoints: [],
-        });
+        await touchPath(page, [from, to], { steps: 10 });
         await expect
             .poll(async () =>
                 (await layoutOf(page)).find(

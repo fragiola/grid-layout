@@ -29,6 +29,7 @@ import {
     useCallback,
     useContext,
     useEffect,
+    useMemo,
     useRef,
     useSyncExternalStore,
 } from "react";
@@ -401,4 +402,44 @@ export function useDragPreview(gridLayoutRef?: GridLayoutRef):
             ref,
         },
     };
+}
+
+/** The active breakpoint, its columns and the grid's width (0 before it is measured). */
+export interface BreakpointInfo {
+    readonly breakpoint: string;
+    readonly cols: number;
+    readonly width: number;
+}
+
+/**
+ * The grid's breakpoint, its columns and its width, inside a root or (through its
+ * `gridLayoutRef`) from anywhere; `undefined` from outside before a root holds the ref.
+ */
+export function useBreakpoint(): BreakpointInfo;
+export function useBreakpoint(
+    gridLayoutRef: GridLayoutRef | undefined,
+): BreakpointInfo | undefined;
+export function useBreakpoint(
+    gridLayoutRef?: GridLayoutRef,
+): BreakpointInfo | undefined {
+    const grid = useGrid("useBreakpoint", gridLayoutRef);
+    const view = useViewOf(grid);
+    const name = view?.breakpoint;
+    const width = view?.width ?? 0;
+    const measuredCols = view?.geometry?.cols;
+    // a new object only when one of the three changes
+    return useMemo(
+        () =>
+            grid && name !== undefined
+                ? {
+                      breakpoint: name,
+                      cols:
+                          measuredCols ??
+                          grid.model.get("cols-by", { breakpoint: name }) ??
+                          grid.model.get("cols"),
+                      width,
+                  }
+                : undefined,
+        [grid, name, width, measuredCols],
+    );
 }

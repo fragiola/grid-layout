@@ -11,10 +11,12 @@ export {
     useGridLayoutRef,
 } from "./gridLayoutRef";
 export {
+    type BreakpointInfo,
     type DragSourceHookResult,
     type DragSourceOptions,
     type DropDetails,
     type PartHookResult,
+    useBreakpoint,
     useDragHandle,
     useDragPreview,
     useDragSource,

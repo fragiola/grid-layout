@@ -80,7 +80,7 @@ export type GridSettings = Partial<
 > & {
     /** the columns, for every breakpoint or each one */
     readonly cols?: number | Readonly<Record<string, number>> | undefined;
-    /** each breakpoint's minimum width; the active one must stay */
+    /** each breakpoint's minimum width; the active one gone, the widest becomes active */
     readonly breakpoints?: Breakpoints | undefined;
 };
 
@@ -163,8 +163,8 @@ export interface CommandMap {
         result: { readonly rules: LayoutRules };
     };
     /**
-     * makes a breakpoint the active one, its columns the grid's. A breakpoint without a layout,
-     * or whose items differ from the one before, is brought up to date right after
+     * makes a breakpoint the active one, its columns the grid's, its layout brought up to date
+     * with the items of the one before. A breakpoint without a layout gets one right after
      * (`layouts.generate`)
      */
     "breakpoint.set": {

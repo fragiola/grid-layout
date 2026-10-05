@@ -580,10 +580,11 @@ const handlers: Handlers = {
             settings.breakpoints === undefined
                 ? state.breakpoints
                 : checkBreakpoints(settings.breakpoints);
-        need(
-            Object.hasOwn(breakpoints, state.breakpoint),
-            `the active breakpoint "${state.breakpoint}" must stay`,
-        );
+        // the active breakpoint gone: the widest one becomes active (the engine then picks the
+        // width's), its layout generated from the one that goes
+        const active = Object.hasOwn(breakpoints, state.breakpoint)
+            ? state.breakpoint
+            : (sortBreakpoints(breakpoints).at(-1) ?? state.breakpoint);
         const columns = columnsFor(
             breakpoints,
             settings.cols ?? keptColumns(state, breakpoints),
@@ -594,7 +595,8 @@ const handlers: Handlers = {
                 ? state.breakpoints
                 : Object.freeze({ ...breakpoints }),
             columns: sameMap(columns, state.columns) ? state.columns : columns,
-            cols: columns[state.breakpoint] ?? state.cols,
+            breakpoint: active,
+            cols: columns[active] ?? state.cols,
             maxRows: maxRows ?? state.maxRows,
             compactor: compactor ?? state.compactor,
             preventCollision: preventCollision ?? state.preventCollision,
@@ -612,6 +614,21 @@ const handlers: Handlers = {
             );
         // the same layouts object when no layout changed: listeners can tell a rule's change
         // from a layout's (`before.layouts !== after.layouts`)
+        if (
+            active !== state.breakpoint &&
+            !normalisedLayouts.some(([breakpoint]) => breakpoint === active)
+        ) {
+            normalisedLayouts.push([
+                active,
+                generateLayout({
+                    layouts: state.layouts,
+                    breakpoints,
+                    target: active,
+                    from: state.breakpoint,
+                    rules: rulesAt(configured, active),
+                }),
+            ]);
+        }
         const layouts =
             normalisedLayouts.length === Object.keys(state.layouts).length &&
             normalisedLayouts.every(
@@ -620,6 +637,7 @@ const handlers: Handlers = {
                 ? state.layouts
                 : Object.freeze(Object.fromEntries(normalisedLayouts));
         const same =
+            configured.breakpoint === state.breakpoint &&
             configured.breakpoints === state.breakpoints &&
             configured.columns === state.columns &&
             configured.maxRows === state.maxRows &&
@@ -637,10 +655,29 @@ const handlers: Handlers = {
         const cols = state.columns[breakpoint] ?? state.cols;
         if (breakpoint === state.breakpoint)
             return done(state, { breakpoint, cols });
-        return done(Object.freeze({ ...state, breakpoint, cols }), {
+        const switched: GridLayoutState = Object.freeze({
+            ...state,
             breakpoint,
             cols,
         });
+        // a layout it has, with other items than the one before: brought up to date in the same
+        // change (a missing one is generated right after, as a command of its own)
+        const own = state.layouts[breakpoint];
+        const next =
+            own && otherItems(own, state.layouts[state.breakpoint])
+                ? withLayoutAt(
+                      switched,
+                      breakpoint,
+                      generateLayout({
+                          layouts: state.layouts,
+                          breakpoints: state.breakpoints,
+                          target: breakpoint,
+                          from: state.breakpoint,
+                          rules: rulesAt(switched, breakpoint),
+                      }),
+                  )
+                : switched;
+        return done(next, { breakpoint, cols });
     },
 
     "layouts.set": (state, { layouts }) => {
@@ -893,18 +930,11 @@ export function createGridLayoutModel(
                         });
                     }
                 }
-                // the active breakpoint without a layout, or with other items than the one before
-                // it: brought up to date right after, as a command of its own (R3)
+                // the active breakpoint without a layout: generated right after, as a command of
+                // its own (R3), from the one before it when it just became active
                 const active = state.breakpoint;
                 const switched = before.breakpoint !== active;
-                if (
-                    !state.layouts[active] ||
-                    (switched &&
-                        otherItems(
-                            state.layouts[active],
-                            state.layouts[before.breakpoint],
-                        ))
-                ) {
+                if (!state.layouts[active]) {
                     queue.unshift({
                         command: "layouts.generate",
                         payload: {

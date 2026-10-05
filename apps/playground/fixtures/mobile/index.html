@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Mobile fixture</title>
+        <style>
+            /* the fixture's own few lines: a page long enough to scroll, hit areas for touch */
+            body { margin: 0; padding: 16px; font: 13px/1.2 system-ui, sans-serif; }
+            .spacer { height: 600px; background: repeating-linear-gradient(#fafafa 0 20px, #f0f0f0 20px 40px); }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            /* a held press is the app's to show; the long press's callout and selection too */
+            [data-grid-layout-part="item"][data-pressing] { outline: 2px solid #06c; }
+            [data-grid-layout-part="item"] { -webkit-touch-callout: none; user-select: none; }
+            [data-grid-layout-part="drag-handle"] { width: 32px; height: 32px; background: #06c; }
+            [data-grid-layout-part="drag-source"] { height: 44px; margin: 8px 0; outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountMobileFixture } from "../../src/fixture/mobile-fixture.tsx";
+            mountMobileFixture();
+        </script>
+    </body>
+</html>

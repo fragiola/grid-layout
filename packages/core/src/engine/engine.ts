@@ -1048,15 +1048,44 @@ export function createGridLayoutEngine(
         };
     }
 
-    /** One axis's scroll for the pointer now, or 0 outside the edge zones (R6). */
+    /**
+     * How far past the grid's end a gesture may scroll down: half a held item (room to put it
+     * below the last row, its centre within the grid's reach), a row for a resize (the preview
+     * grows a row at a time).
+     */
+    function reachBelow(current: Session): number {
+        if (current.kind !== "resize") return current.startRect.height / 2;
+        const geometry = geometryOf();
+        return geometry ? geometry.rowHeight + geometry.gap[1] : 0;
+    }
+
+    /**
+     * One axis's scroll for the pointer now, or 0 outside the edge zones (R6), and 0 once the
+     * grid's own box is all in view that way: the held item, drawn past it, never makes more room
+     * to scroll into. Down, with `autoSize`, a little more ({@link reachBelow}): the grid grows to
+     * take what the gesture brings below its last row.
+     */
     function axisStep(current: Session, axis: "x" | "y"): number {
         const at = current.pending ?? current.last;
         const scroller = current.scrollers?.[axis];
         if (!root || !at || !scroller) return 0;
         const box = visibleBox(scroller, root.ownerDocument);
-        return axis === "y"
-            ? edgeStep(at.clientY, box.top, box.bottom)
-            : edgeStep(at.clientX, box.left, box.right);
+        const grid = root.getBoundingClientRect();
+        const [step, before, after] =
+            axis === "y"
+                ? [
+                      edgeStep(at.clientY, box.top, box.bottom),
+                      grid.top < box.top,
+                      grid.bottom +
+                          (settings.autoSize ? reachBelow(current) : 0) >
+                          box.bottom,
+                  ]
+                : [
+                      edgeStep(at.clientX, box.left, box.right),
+                      grid.left < box.left,
+                      grid.right > box.right,
+                  ];
+        return (step < 0 && before) || (step > 0 && after) ? step : 0;
     }
 
     /** Scrolls `scroller` by `delta` along `axis` at once; says whether it moved. */
