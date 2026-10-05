@@ -29,3 +29,9 @@ export const DRAG_EXEMPT = [
     '[contenteditable]:not([contenteditable="false"])',
     `[${NO_DRAG_ATTRIBUTE}]`,
 ].join(", ");
+
+/**
+ * On an item a touch holds before it drags (R5): set by the engine on the item's element, not
+ * through the view, so a touch that turns out a scroll renders nothing.
+ */
+export const PRESSING_ATTRIBUTE = "data-pressing";

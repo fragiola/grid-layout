@@ -5,6 +5,7 @@ export {
     ITEM_ATTRIBUTE,
     NO_DRAG_ATTRIBUTE,
     PART_ATTRIBUTE,
+    PRESSING_ATTRIBUTE,
 } from "./engine/dom";
 export { createGridLayoutEngine } from "./engine/engine";
 export {
@@ -41,6 +42,7 @@ export type {
     GridLayoutEngineAdapter,
     GridLayoutEngineOptions,
     GridLayoutView,
+    PerBreakpoint,
 } from "./engine/types";
 export {
     bottom,
@@ -81,6 +83,13 @@ export {
 } from "./layout/normalise";
 export { resizeRect, sideEdges } from "./layout/resize";
 export {
+    type Breakpoints,
+    breakpointFor,
+    type Generation,
+    generateLayout,
+    sortBreakpoints,
+} from "./layout/responsive";
+export {
     type Compactor,
     type CompactType,
     type GridRect,
@@ -99,6 +108,7 @@ export {
     veto,
 } from "./model/model";
 export {
+    type AtBreakpoint,
     type CommandContext,
     type CommandError,
     type CommandErrorCode,

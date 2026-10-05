@@ -16,6 +16,8 @@ const REPRESENTATIVE: string[] = [
     "rtl-layout", // right-to-left text and mirrored places
     "widget-sidebar", // drag sources, a drag preview and widgets of several kinds
     "dashboard-builder", // the sidebar, a trash and the app's buttons together
+    "mobile-dashboard", // a phone frame, the press feedback
+    "container-breakpoints", // two grids at two breakpoints, a range input
 ];
 
 const slugs = new Set(EXAMPLES.map((example) => example.slug));

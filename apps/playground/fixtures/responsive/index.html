@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Responsive fixture</title>
+        <style>
+            /* the fixture's own few lines: a container whose width the buttons set, a page to read */
+            body { margin: 0; padding: 40px; font: 13px/1.2 system-ui, sans-serif; }
+            [data-testid="container"] { outline: 1px dashed #888; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountResponsiveFixture } from "../../src/fixture/responsive-fixture.tsx";
+            mountResponsiveFixture();
+        </script>
+    </body>
+</html>

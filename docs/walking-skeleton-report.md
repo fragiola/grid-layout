@@ -65,7 +65,13 @@ items per preview. The fast compactors of Epic #18 address large layouts.
     height with `autoSize`), the preview returns it to its cell and a release there runs no
     command. `drag-stop` reports `outside` and the element under the pointer, so the app can remove
     it. React Grid Layout clamps the item to the edge cell. A `bounded` grid never lets an item out.
-12. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
+12. **Breakpoints by the grid's own width, at their minimum** (added by Epic #13, R1). The
+    breakpoint for a width is the widest whose minimum is at most the width; React Grid Layout's
+    must be exceeded (at 996 px it says `sm`, here `md`). Every breakpoint shows the same items:
+    one added or removed on a breakpoint is added or removed on the others at their next
+    activation, while each keeps its own places. A width wavering at a threshold (a scrollbar)
+    settles: crossing back the threshold just crossed needs 24 px more.
+13. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
     logical sides and right-to-left, middleware that can refuse a gesture's landing (the preview
     shows the item going back), and `item.place` for a move and a resize at once.
 

@@ -118,3 +118,80 @@ export function shapes(layout: readonly Box[]) {
         .map(({ x, y, w, h }) => ({ x, y, w, h }))
         .sort((p, q) => p.y - q.y || p.x - q.x);
 }
+
+/**
+ * A finger on the screen along `points`: down at the first, held `hold` milliseconds, then moved
+ * through the others and lifted. Chromium's real touch input (the DevTools protocol, which also
+ * scrolls the page); elsewhere, touch pointer events dispatched on the page (no native scroll).
+ */
+export async function touchPath(
+    page: Page,
+    points: readonly { x: number; y: number }[],
+    options: { hold?: number; steps?: number } = {},
+): Promise<void> {
+    const { hold = 0, steps = 8 } = options;
+    const [first, ...rest] = points;
+    if (!first) return;
+    const path: { x: number; y: number }[] = [];
+    let from = first;
+    for (const to of rest) {
+        for (let step = 1; step <= steps; step++) {
+            path.push({
+                x: from.x + ((to.x - from.x) * step) / steps,
+                y: from.y + ((to.y - from.y) * step) / steps,
+            });
+        }
+        from = to;
+    }
+    if (page.context().browser()?.browserType().name() === "chromium") {
+        const client = await page.context().newCDPSession(page);
+        await client.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [first],
+        });
+        if (hold > 0) await page.waitForTimeout(hold);
+        for (const point of path) {
+            await client.send("Input.dispatchTouchEvent", {
+                type: "touchMove",
+                touchPoints: [point],
+            });
+        }
+        await client.send("Input.dispatchTouchEvent", {
+            type: "touchEnd",
+            touchPoints: [],
+        });
+        await client.detach();
+        return;
+    }
+    await page.evaluate(
+        async ({ first, path, hold }) => {
+            const target = document.elementFromPoint(first.x, first.y);
+            const fire = (
+                type: string,
+                at: { x: number; y: number },
+                on: EventTarget,
+            ) =>
+                on.dispatchEvent(
+                    new PointerEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 7,
+                        pointerType: "touch",
+                        isPrimary: true,
+                        clientX: at.x,
+                        clientY: at.y,
+                        buttons: type === "pointerup" ? 0 : 1,
+                    }),
+                );
+            if (!target) return;
+            fire("pointerdown", first, target);
+            await new Promise((done) => setTimeout(done, hold));
+            for (const at of path) {
+                fire("pointermove", at, document);
+                await new Promise((done) => requestAnimationFrame(done));
+            }
+            fire("pointerup", path.at(-1) ?? first, document);
+        },
+        { first, path, hold },
+    );
+}

@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 // What the example specs share: an item by its accessible name, a drag by the mouse, and boxes on
 // screen to compare.
@@ -107,4 +107,58 @@ export async function inRoot(page: Page, fx: number, fy: number) {
         page.getByTestId("stage").locator('[data-grid-layout-part="root"]'),
     );
     return { x: root.x + root.width * fx, y: root.y + root.height * fy };
+}
+
+/** Whether the test runs on the phone project: touch, not a mouse. */
+export function onPhone(): boolean {
+    return test.info().project.name === "mobile";
+}
+
+/**
+ * Drags from one point to another: with a finger on the phone project (real touch input, held
+ * `hold` milliseconds first: an item's body needs a long press), with the mouse elsewhere.
+ */
+export async function dragAlong(
+    page: Page,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    options: { hold?: number } = {},
+) {
+    if (!onPhone()) {
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down();
+        await page.mouse.move(to.x, to.y, { steps: 12 });
+        await page.mouse.up();
+        await settled(page);
+        return;
+    }
+    const client = await page.context().newCDPSession(page);
+    await client.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [from],
+    });
+    if (options.hold) await page.waitForTimeout(options.hold);
+    for (let step = 1; step <= 12; step++) {
+        await client.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+                {
+                    x: from.x + ((to.x - from.x) * step) / 12,
+                    y: from.y + ((to.y - from.y) * step) / 12,
+                },
+            ],
+        });
+    }
+    await client.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+    });
+    await client.detach();
+    await settled(page);
+}
+
+/** The centre of an element on screen. */
+export async function middle(locator: Locator) {
+    const box = await boxOf(locator);
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }

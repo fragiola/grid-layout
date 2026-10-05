@@ -43,6 +43,7 @@ const DERIVED: { file: string; from: keyof typeof NOTICES }[] = [
     { file: "src/layout/move.ts", from: "react-grid-layout" },
     { file: "src/layout/normalise.ts", from: "react-grid-layout" },
     { file: "src/layout/resize.ts", from: "react-grid-layout" },
+    { file: "src/layout/responsive.ts", from: "react-grid-layout" },
 ];
 
 /** What a derived file's header and the root LICENSE must name, per reference project. */

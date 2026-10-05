@@ -18,6 +18,7 @@ const s: LayoutItem = { id: "s", x: 2, y: 0, w: 1, h: 1, static: true };
 function view(over: Partial<GridLayoutView> = {}): GridLayoutView {
     return {
         width: 400,
+        breakpoint: "default",
         height: 120,
         dir: "ltr",
         geometry: {
@@ -53,11 +54,15 @@ describe("the parts", () => {
                 dropping: false,
                 dropRefused: false,
                 outside: false,
+                breakpoint: "default",
                 resizing: false,
                 grabbed: false,
                 dir: "ltr",
             },
-            attributes: { "data-grid-layout-part": "root" },
+            attributes: {
+                "data-grid-layout-part": "root",
+                "data-breakpoint": "default",
+            },
             style: { position: "relative", height: 120 },
         });
         expect(rootPart(view({ height: 0 })).style).toEqual({

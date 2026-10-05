@@ -20,7 +20,16 @@ export default defineConfig({
         baseURL: `http://localhost:${PORT}${BASE}`,
         trace: "on-first-retry",
     },
-    projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+    projects: [
+        { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+        // the mobile examples again on a phone: real touch input (Chromium's)
+        {
+            name: "mobile",
+            use: { ...devices["Pixel 7"] },
+            testMatch:
+                /examples\/(mobile-dashboard|home-screen|widget-sheet)\.spec\.ts$/,
+        },
+    ],
     webServer: {
         command: `node scripts/generate.ts && vite build --outDir .e2e/dist --emptyOutDir && node e2e/serve.ts ${PORT}`,
         env: { EMBED_BASE: BASE },

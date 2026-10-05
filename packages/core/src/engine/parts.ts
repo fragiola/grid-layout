@@ -67,6 +67,8 @@ export interface RootState {
     readonly dropRefused: boolean;
     /** the pointer holding an item or bringing one is off the grid */
     readonly outside: boolean;
+    /** the active breakpoint (`data-breakpoint`) */
+    readonly breakpoint: string;
     readonly dir: "ltr" | "rtl";
 }
 
@@ -82,12 +84,14 @@ export function rootPart(view: GridLayoutView): Part<RootState> {
         dropping: kind === "drop" && !outside,
         dropRefused: view.dropRefused && !outside,
         outside,
+        breakpoint: view.breakpoint,
         dir: view.dir,
     };
     return {
         state,
         attributes: {
             [PART_ATTRIBUTE]: "root",
+            "data-breakpoint": state.breakpoint,
             ...flags({
                 "data-dragging": state.dragging,
                 "data-resizing": state.resizing,

@@ -1,0 +1,83 @@
+---
+title: Responsive grids
+description: Breakpoints by the grid's own width, columns and a layout for each, how a missing layout is generated, and how to give every layout yourself.
+---
+
+A responsive grid declares **breakpoints**: names with a minimum width each. The grid takes the
+widest breakpoint whose minimum its **own** width reaches, never the window's. Two grids on one
+page can be at two breakpoints at once.
+
+```tsx title="dashboard.tsx"
+<GridLayout.Root
+    breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+    cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+    defaultLayouts={{ lg: wide, sm: narrow }}
+    onLayoutChange={(layout, layouts) => save(layouts)}
+>
+```
+
+Each breakpoint has its own columns and its own layout. An edit, a drag or a resize, changes the
+active breakpoint's layout only. The others keep theirs, and a breakpoint shows its layout as it
+was left when it becomes active again.
+
+<Example id="responsive-layouts" />
+
+## Which breakpoint
+
+The grid measures itself and takes the widest breakpoint whose minimum is at most its width: at
+exactly 996 pixels, `md` above. It tells each change once, with the new breakpoint's columns:
+
+```tsx title="breakpoint.tsx"
+<GridLayout.Root onBreakpointChange={(breakpoint, cols) => setAt(breakpoint)} />
+```
+
+`useBreakpoint()` inside the root, or `useBreakpoint(gridLayoutRef)` anywhere, gives
+`{ breakpoint, cols, width }`, and the root carries `data-breakpoint`.
+
+- **`breakpoint`** controls it: the grid stays there whatever its width.
+- **`defaultBreakpoint`** is where it starts before it is measured, as on a server render.
+- A width wavering at a threshold, when the new breakpoint's layout brings a scrollbar, settles.
+  To cross back the threshold it just crossed, the width must go 24 pixels past it.
+
+<Example id="container-breakpoints" />
+
+## A layout for each breakpoint
+
+Give the layouts you have, controlled (`layouts`) or not (`defaultLayouts`). A breakpoint you
+leave out gets one the first time it is active:
+
+1. the nearest **larger** breakpoint's layout, else the one active just before, else the nearest
+   smaller one's;
+2. with the items of the breakpoint active just before (every breakpoint shows the same items);
+3. brought within the new columns: an item too wide shrinks, one past the last column moves in;
+4. settled by the compactor, so a gap in the source closes.
+
+The generated layout is committed as a command of its own, `layouts.generate`. Middleware sees
+it, and `onLayoutChange` tells it with every breakpoint's layouts, so what you save holds it.
+
+To avoid surprises, give every layout yourself. The grid then generates none, as here with the
+same twelve columns at every breakpoint and only the widths changing:
+
+<Example id="bootstrap-style" />
+
+## The same items everywhere
+
+Every breakpoint shows the same items, each in its own place. An item added or removed on one
+breakpoint is added to or removed from the others when they are next active: added below
+everything at the column it has, then settled. Hiding an item on one breakpoint only is not
+possible yet.
+
+## Geometry per breakpoint
+
+`gap`, `padding` and `rowHeight` take one value or one per breakpoint:
+
+```tsx title="geometry.tsx"
+<GridLayout.Root rowHeight={{ lg: 60, sm: 48 }} gap={{ lg: [16, 16], sm: [8, 8] }} />
+```
+
+## Saving them
+
+`onLayoutChange(layout, layouts)` gives the active layout and every breakpoint's. Save the map
+and start from it next time:
+
+<Example id="responsive-persistence" />

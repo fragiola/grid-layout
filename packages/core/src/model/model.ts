@@ -16,6 +16,12 @@ import { fitSize } from "../layout/limits";
 import { layoutProblems, normaliseLayout } from "../layout/normalise";
 import { resizeRect } from "../layout/resize";
 import {
+    type Breakpoints,
+    breakpointFor,
+    generateLayout,
+    sortBreakpoints,
+} from "../layout/responsive";
+import {
     type Layout,
     type LayoutItem,
     type LayoutRules,
@@ -92,15 +98,16 @@ export function rulesOf(state: GridLayoutState): LayoutRules {
     };
 }
 
-/** `state` with the active layout replaced (the same state when it is the same layout). */
-function withLayout(state: GridLayoutState, layout: Layout): GridLayoutState {
-    if (layout === activeLayout(state)) return state;
+/** `state` with `breakpoint`'s layout replaced (the same state when it is the same layout). */
+function withLayoutAt(
+    state: GridLayoutState,
+    breakpoint: string,
+    layout: Layout,
+): GridLayoutState {
+    if (layout === state.layouts[breakpoint]) return state;
     return Object.freeze({
         ...state,
-        layouts: Object.freeze({
-            ...state.layouts,
-            [state.breakpoint]: layout,
-        }),
+        layouts: Object.freeze({ ...state.layouts, [breakpoint]: layout }),
     });
 }
 
@@ -124,18 +131,76 @@ function normalised(layout: Layout, rules: LayoutRules): Layout {
     return result.layout;
 }
 
-/** The item `itemId` of the active layout, or the `not_found` failure. */
-function found(
+/** What every layout change at `breakpoint` obeys: the grid's rules, in that breakpoint's columns. */
+function rulesAt(state: GridLayoutState, breakpoint: string): LayoutRules {
+    return {
+        ...rulesOf(state),
+        cols: state.columns[breakpoint] ?? state.cols,
+    };
+}
+
+/** Throws a {@link PayloadError} unless `name` is one of `state`'s breakpoints. */
+function knownBreakpoint(
     state: GridLayoutState,
-    itemId: unknown,
-): LayoutItem | CommandFailure {
+    name: unknown,
+): asserts name is string {
+    need(
+        typeof name === "string" && Object.hasOwn(state.breakpoints, name),
+        `no breakpoint "${String(name)}"`,
+    );
+}
+
+/** The breakpoint a command edits, its layout and its rules. */
+interface Target {
+    readonly breakpoint: string;
+    readonly layout: Layout;
+    readonly rules: LayoutRules;
+}
+
+/** The breakpoint a payload names (the active one by default), or why it cannot be edited. */
+function targetOf(
+    state: GridLayoutState,
+    breakpoint: unknown,
+): Target | CommandFailure {
+    const name = breakpoint ?? state.breakpoint;
+    knownBreakpoint(state, name);
+    // the active one without a layout (its generation refused) is empty: commands make one
+    const layout =
+        state.layouts[name] ?? (name === state.breakpoint ? [] : undefined);
+    if (!layout) {
+        return fail("not_found", `breakpoint "${name}" has no layout yet`);
+    }
+    return { breakpoint: name, layout, rules: rulesAt(state, name) };
+}
+
+/**
+ * `state` with an item added to (or removed from) another breakpoint than the active one also
+ * added to (removed from) the active one: every breakpoint shows the same items, and the others
+ * follow the active one at their next activation (R3).
+ */
+function alsoActive(
+    state: GridLayoutState,
+    target: Target,
+    change: (layout: Layout, rules: LayoutRules) => Layout,
+): GridLayoutState {
+    const active = state.layouts[state.breakpoint];
+    if (target.breakpoint === state.breakpoint || !active) return state;
+    return withLayoutAt(
+        state,
+        state.breakpoint,
+        change(active, rulesAt(state, state.breakpoint)),
+    );
+}
+
+/** The item `itemId` of `layout`, or the `not_found` failure. */
+function found(layout: Layout, itemId: unknown): LayoutItem | CommandFailure {
     need(typeof itemId === "string", "itemId must be a string");
-    const item = activeLayout(state).find((entry) => entry.id === itemId);
+    const item = layout.find((entry) => entry.id === itemId);
     return item ?? fail("not_found", `no item "${itemId}"`);
 }
 
-const isFailure = (
-    value: LayoutItem | CommandFailure,
+const isFailure = <T extends object>(
+    value: T | CommandFailure,
 ): value is CommandFailure => "ok" in value;
 
 function itemIn(layout: Layout, itemId: string): LayoutItem {
@@ -155,18 +220,97 @@ const ITEM_SETTINGS = [
     "resizable",
 ] as const satisfies readonly (keyof ItemSettings)[];
 
+/** Throws a {@link PayloadError} when `breakpoints` is not a map of minimum widths. */
+function checkBreakpoints(breakpoints: unknown): Breakpoints {
+    need(
+        typeof breakpoints === "object" &&
+            breakpoints !== null &&
+            Object.keys(breakpoints).length > 0,
+        "breakpoints must name at least one breakpoint",
+    );
+    for (const [name, min] of Object.entries(breakpoints)) {
+        need(
+            typeof min === "number" && Number.isFinite(min) && min >= 0,
+            `breakpoint "${name}" must have a minimum width of 0 or more`,
+        );
+    }
+    return breakpoints as Breakpoints;
+}
+
+/**
+ * Each breakpoint's columns from `cols` (one number for all, or one per breakpoint), or throws a
+ * {@link PayloadError}: every breakpoint has columns, and the map names no other.
+ */
+function columnsFor(
+    breakpoints: Breakpoints,
+    cols: unknown,
+): Readonly<Record<string, number>> {
+    const isCols = (value: unknown) => isInteger(value) && value >= 1;
+    if (typeof cols === "number") {
+        need(isCols(cols), "cols must be an integer of at least 1");
+        return Object.freeze(
+            Object.fromEntries(
+                Object.keys(breakpoints).map((name) => [name, cols]),
+            ),
+        );
+    }
+    need(
+        typeof cols === "object" && cols !== null,
+        "cols must be a number, or one per breakpoint",
+    );
+    const map = cols as Record<string, unknown>;
+    for (const name of Object.keys(breakpoints)) {
+        need(
+            isCols(map[name]),
+            `cols for breakpoint "${name}" must be an integer of at least 1`,
+        );
+    }
+    for (const name of Object.keys(map)) {
+        need(
+            Object.hasOwn(breakpoints, name),
+            `cols names no breakpoint "${name}"`,
+        );
+    }
+    return Object.freeze({ ...(map as Record<string, number>) });
+}
+
+/**
+ * The columns `state` has for `breakpoints` (new breakpoints changed without new columns): one
+ * number when every breakpoint has the same, else the map of the breakpoints that stay.
+ */
+function keptColumns(
+    state: GridLayoutState,
+    breakpoints: Breakpoints,
+): number | Readonly<Record<string, number>> {
+    const values = new Set(Object.values(state.columns));
+    const [only] = values;
+    if (values.size === 1 && only !== undefined) return only;
+    return Object.fromEntries(
+        Object.entries(state.columns).filter(([name]) =>
+            Object.hasOwn(breakpoints, name),
+        ),
+    );
+}
+
+/** Whether two maps hold the same values under the same keys. */
+function sameMap<T>(
+    a: Readonly<Record<string, T>>,
+    b: Readonly<Record<string, T>>,
+): boolean {
+    const keys = Object.keys(a);
+    return (
+        keys.length === Object.keys(b).length &&
+        keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key])
+    );
+}
+
 /** Throws a {@link PayloadError} when `settings` is not what `grid.configure` takes. */
 function checkGridSettings(settings: GridSettings): void {
     need(
         typeof settings === "object" && settings !== null,
         "settings must be an object",
     );
-    const { cols, maxRows, compactor, preventCollision, allowOverlap } =
-        settings;
-    need(
-        cols === undefined || (isInteger(cols) && cols >= 1),
-        "cols must be an integer of at least 1",
-    );
+    const { maxRows, compactor, preventCollision, allowOverlap } = settings;
     need(
         isLimit(maxRows),
         "maxRows must be an integer of at least 1, or Infinity",
@@ -189,6 +333,27 @@ function checkGridSettings(settings: GridSettings): void {
     }
 }
 
+/** Every layout of `layouts` checked, corrected and settled in its breakpoint's columns. */
+function settledLayouts(
+    state: GridLayoutState,
+    layouts: unknown,
+): Readonly<Record<string, Layout>> {
+    need(
+        typeof layouts === "object" && layouts !== null,
+        "layouts must map breakpoints to layouts",
+    );
+    const entries = Object.entries(layouts as Record<string, Layout>).map(
+        ([name, layout]) => {
+            need(
+                Object.hasOwn(state.breakpoints, name),
+                `layouts names no breakpoint "${name}"`,
+            );
+            return [name, normalised(layout, rulesAt(state, name))] as const;
+        },
+    );
+    return Object.freeze(Object.fromEntries(entries));
+}
+
 type Handlers = {
     [C in CommandName]: (
         state: GridLayoutState,
@@ -197,17 +362,21 @@ type Handlers = {
 };
 
 const handlers: Handlers = {
-    "layout.set": (state, { layout }) => {
-        const next = normalised(layout, rulesOf(state));
-        return done(withLayout(state, next), { layout: next });
+    "layout.set": (state, { layout, breakpoint }) => {
+        const name = breakpoint ?? state.breakpoint;
+        knownBreakpoint(state, name);
+        const next = normalised(layout, rulesAt(state, name));
+        return done(withLayoutAt(state, name, next), { layout: next });
     },
 
-    "item.add": (state, { item }) => {
+    "item.add": (state, { item, breakpoint }) => {
         need(
             typeof item === "object" && item !== null,
             "item must be an object",
         );
-        const layout = activeLayout(state);
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const { layout, rules } = target;
         need(
             !layout.some((entry) => entry.id === item.id),
             `id "${String(item.id)}" is already used`,
@@ -217,40 +386,70 @@ const handlers: Handlers = {
         ]);
         need(problems.length === 0, problems.map((p) => p.message).join("; "));
         // the size within the item's own limits and the columns
-        const { w, h } = fitSize(item, state.cols);
+        const { w, h } = fitSize(item, rules.cols);
         // `y: Infinity` means below everything, as in a layout
         const y =
             item.y === Number.POSITIVE_INFINITY ? bottomOf(layout) : item.y;
-        const next = addItem(layout, { ...item, y, w, h }, rulesOf(state));
-        return done(withLayout(state, next), {
-            item: itemIn(next, item.id),
-            layout: next,
-        });
+        const next = addItem(layout, { ...item, y, w, h }, rules);
+        return done(
+            alsoActive(
+                withLayoutAt(state, target.breakpoint, next),
+                target,
+                (active, activeRules) =>
+                    active.some((entry) => entry.id === item.id)
+                        ? active
+                        : addItem(
+                              active,
+                              {
+                                  ...item,
+                                  y:
+                                      item.y === Number.POSITIVE_INFINITY
+                                          ? bottomOf(active)
+                                          : item.y,
+                                  ...fitSize(item, activeRules.cols),
+                              },
+                              activeRules,
+                          ),
+            ),
+            { item: itemIn(next, item.id), layout: next },
+        );
     },
 
-    "item.remove": (state, { itemId }) => {
-        const item = found(state, itemId);
+    "item.remove": (state, { itemId, breakpoint }) => {
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const item = found(target.layout, itemId);
         if (isFailure(item)) return item;
-        const next = removeItem(activeLayout(state), item.id, rulesOf(state));
-        return done(withLayout(state, next), { itemId: item.id });
+        const next = removeItem(target.layout, item.id, target.rules);
+        return done(
+            alsoActive(
+                withLayoutAt(state, target.breakpoint, next),
+                target,
+                (active, activeRules) =>
+                    removeItem(active, item.id, activeRules),
+            ),
+            { itemId: item.id },
+        );
     },
 
-    "item.move": (state, { itemId, x, y }) => {
+    "item.move": (state, { itemId, x, y, breakpoint }) => {
         need(isInteger(x) && isInteger(y), "x and y must be integers");
-        const item = found(state, itemId);
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const { layout, rules } = target;
+        const item = found(layout, itemId);
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
         need(
             x >= 0 &&
                 y >= 0 &&
-                x + item.w <= state.cols &&
+                x + item.w <= rules.cols &&
                 y + item.h <= state.maxRows,
             `the cell ${x},${y} puts item "${item.id}" outside the grid`,
         );
-        const layout = activeLayout(state);
         if (state.preventCollision && !state.allowOverlap) {
-            const target = { ...item, x, y };
-            const hit = layout.find((other) => collides(other, target));
+            const moved = { ...item, x, y };
+            const hit = layout.find((other) => collides(other, moved));
             if (hit) {
                 return fail(
                     "collision",
@@ -258,27 +457,32 @@ const handlers: Handlers = {
                 );
             }
         }
-        const next = moveItem(layout, item.id, x, y, rulesOf(state));
-        return done(withLayout(state, next), {
+        const next = moveItem(layout, item.id, x, y, rules);
+        return done(withLayoutAt(state, target.breakpoint, next), {
             item: itemIn(next, item.id),
             layout: next,
         });
     },
 
-    "item.resize": (state, { itemId, w, h, side = "bottom-end" }) => {
+    "item.resize": (
+        state,
+        { itemId, w, h, side = "bottom-end", breakpoint },
+    ) => {
         need(isInteger(w) && isInteger(h), "w and h must be integers");
         need(
             RESIZE_SIDES.includes(side as ResizeSide),
             `no resize side "${String(side)}"`,
         );
-        const item = found(state, itemId);
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const { layout, rules } = target;
+        const item = found(layout, itemId);
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
-        const layout = activeLayout(state);
         if (state.preventCollision && !state.allowOverlap) {
-            const rect = resizeRect(item, side, { w, h }, rulesOf(state));
-            const target = { ...item, ...rect };
-            const hit = layout.find((other) => collides(other, target));
+            const rect = resizeRect(item, side, { w, h }, rules);
+            const sized = { ...item, ...rect };
+            const hit = layout.find((other) => collides(other, sized));
             if (hit) {
                 return fail(
                     "collision",
@@ -286,35 +490,31 @@ const handlers: Handlers = {
                 );
             }
         }
-        const next = resizeItem(
-            layout,
-            item.id,
-            { w, h },
-            side,
-            rulesOf(state),
-        );
-        return done(withLayout(state, next), {
+        const next = resizeItem(layout, item.id, { w, h }, side, rules);
+        return done(withLayoutAt(state, target.breakpoint, next), {
             item: itemIn(next, item.id),
             layout: next,
         });
     },
 
-    "item.place": (state, { itemId, x, y, w, h }) => {
+    "item.place": (state, { itemId, x, y, w, h, breakpoint }) => {
         need(
             [x, y, w, h].every(isInteger) && w >= 1 && h >= 1,
             "x and y must be integers, w and h integers of at least 1",
         );
-        const item = found(state, itemId);
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const { layout, rules } = target;
+        const item = found(layout, itemId);
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
         need(
-            x >= 0 && y >= 0 && x + w <= state.cols && y + h <= state.maxRows,
+            x >= 0 && y >= 0 && x + w <= rules.cols && y + h <= state.maxRows,
             `the box ${x},${y} ${w}×${h} puts item "${item.id}" outside the grid`,
         );
-        const layout = activeLayout(state);
         if (state.preventCollision && !state.allowOverlap) {
-            const target = { id: item.id, x, y, w, h };
-            const hit = layout.find((other) => collides(other, target));
+            const box = { id: item.id, x, y, w, h };
+            const hit = layout.find((other) => collides(other, box));
             if (hit) {
                 return fail(
                     "collision",
@@ -322,14 +522,14 @@ const handlers: Handlers = {
                 );
             }
         }
-        const next = placeItem(layout, item.id, { x, y, w, h }, rulesOf(state));
-        return done(withLayout(state, next), {
+        const next = placeItem(layout, item.id, { x, y, w, h }, rules);
+        return done(withLayoutAt(state, target.breakpoint, next), {
             item: itemIn(next, item.id),
             layout: next,
         });
     },
 
-    "item.configure": (state, { itemId, settings }) => {
+    "item.configure": (state, { itemId, settings, breakpoint }) => {
         need(
             typeof settings === "object" && settings !== null,
             "settings must be an object",
@@ -347,7 +547,10 @@ const handlers: Handlers = {
                 `${key} must be a boolean`,
             );
         }
-        const item = found(state, itemId);
+        const target = targetOf(state, breakpoint);
+        if (isFailure(target)) return target;
+        const { layout } = target;
+        const item = found(layout, itemId);
         if (isFailure(item)) return item;
         // only an item's limits and flags: its place and size go through move and resize
         const picked = Object.fromEntries(
@@ -360,14 +563,13 @@ const handlers: Handlers = {
                 ([key, value]) => item[key as keyof LayoutItem] === value,
             )
         ) {
-            return done(state, { item, layout: activeLayout(state) });
+            return done(state, { item, layout });
         }
-        const layout = activeLayout(state);
         const changed = layout.map((entry) =>
             entry === item ? { ...entry, ...picked } : entry,
         );
-        const next = normalised(changed, rulesOf(state));
-        return done(withLayout(state, next), {
+        const next = normalised(changed, target.rules);
+        return done(withLayoutAt(state, target.breakpoint, next), {
             item: itemIn(next, item.id),
             layout: next,
         });
@@ -375,40 +577,149 @@ const handlers: Handlers = {
 
     "grid.configure": (state, { settings }) => {
         checkGridSettings(settings);
-        const { cols, maxRows, compactor, preventCollision, allowOverlap } =
-            settings;
+        const { maxRows, compactor, preventCollision, allowOverlap } = settings;
+        const breakpoints =
+            settings.breakpoints === undefined
+                ? state.breakpoints
+                : checkBreakpoints(settings.breakpoints);
+        // the active breakpoint gone: the one the settings name (the width's, from an adapter),
+        // else the widest, becomes active, its layout generated from the one that goes
+        const active = Object.hasOwn(breakpoints, state.breakpoint)
+            ? state.breakpoint
+            : settings.breakpoint !== undefined &&
+                Object.hasOwn(breakpoints, settings.breakpoint)
+              ? settings.breakpoint
+              : (sortBreakpoints(breakpoints).at(-1) ?? state.breakpoint);
+        const columns = columnsFor(
+            breakpoints,
+            settings.cols ?? keptColumns(state, breakpoints),
+        );
         const configured: GridLayoutState = {
             ...state,
-            cols: cols ?? state.cols,
+            breakpoints: sameMap(breakpoints, state.breakpoints)
+                ? state.breakpoints
+                : Object.freeze({ ...breakpoints }),
+            columns: sameMap(columns, state.columns) ? state.columns : columns,
+            breakpoint: active,
+            cols: columns[active] ?? state.cols,
             maxRows: maxRows ?? state.maxRows,
             compactor: compactor ?? state.compactor,
             preventCollision: preventCollision ?? state.preventCollision,
             allowOverlap: allowOverlap ?? state.allowOverlap,
         };
-        const rules = rulesOf(configured);
-        const normalisedLayouts = Object.entries(state.layouts).map(
-            ([breakpoint, layout]) =>
-                [breakpoint, normalised(layout, rules)] as const,
-        );
+        // a breakpoint gone takes its layout; the others settle in their columns
+        const normalisedLayouts = Object.entries(state.layouts)
+            .filter(([breakpoint]) => Object.hasOwn(breakpoints, breakpoint))
+            .map(
+                ([breakpoint, layout]) =>
+                    [
+                        breakpoint,
+                        normalised(layout, rulesAt(configured, breakpoint)),
+                    ] as const,
+            );
         // the same layouts object when no layout changed: listeners can tell a rule's change
         // from a layout's (`before.layouts !== after.layouts`)
-        const layouts = normalisedLayouts.every(
-            ([breakpoint, layout]) => layout === state.layouts[breakpoint],
-        )
-            ? state.layouts
-            : Object.freeze(Object.fromEntries(normalisedLayouts));
+        if (
+            active !== state.breakpoint &&
+            !normalisedLayouts.some(([breakpoint]) => breakpoint === active)
+        ) {
+            normalisedLayouts.push([
+                active,
+                generateLayout({
+                    layouts: state.layouts,
+                    breakpoints,
+                    target: active,
+                    from: state.breakpoint,
+                    rules: rulesAt(configured, active),
+                }),
+            ]);
+        }
+        const layouts =
+            normalisedLayouts.length === Object.keys(state.layouts).length &&
+            normalisedLayouts.every(
+                ([breakpoint, layout]) => layout === state.layouts[breakpoint],
+            )
+                ? state.layouts
+                : Object.freeze(Object.fromEntries(normalisedLayouts));
         const same =
-            configured.cols === state.cols &&
+            configured.breakpoint === state.breakpoint &&
+            configured.breakpoints === state.breakpoints &&
+            configured.columns === state.columns &&
             configured.maxRows === state.maxRows &&
             configured.compactor === state.compactor &&
             configured.preventCollision === state.preventCollision &&
             configured.allowOverlap === state.allowOverlap &&
             layouts === state.layouts;
         return done(same ? state : Object.freeze({ ...configured, layouts }), {
-            rules,
+            rules: rulesOf(configured),
         });
     },
+
+    "breakpoint.set": (state, { breakpoint }) => {
+        knownBreakpoint(state, breakpoint);
+        const cols = state.columns[breakpoint] ?? state.cols;
+        if (breakpoint === state.breakpoint)
+            return done(state, { breakpoint, cols });
+        const switched: GridLayoutState = Object.freeze({
+            ...state,
+            breakpoint,
+            cols,
+        });
+        // a layout it has, with other items than the one before: brought up to date in the same
+        // change (a missing one is generated right after, as a command of its own)
+        const own = state.layouts[breakpoint];
+        const next =
+            own && otherItems(own, state.layouts[state.breakpoint])
+                ? withLayoutAt(
+                      switched,
+                      breakpoint,
+                      generateLayout({
+                          layouts: state.layouts,
+                          breakpoints: state.breakpoints,
+                          target: breakpoint,
+                          from: state.breakpoint,
+                          rules: rulesAt(switched, breakpoint),
+                      }),
+                  )
+                : switched;
+        return done(next, { breakpoint, cols });
+    },
+
+    "layouts.set": (state, { layouts }) => {
+        const next = settledLayouts(state, layouts);
+        const same =
+            Object.keys(next).length === Object.keys(state.layouts).length &&
+            Object.entries(next).every(
+                ([breakpoint, layout]) => layout === state.layouts[breakpoint],
+            );
+        return same
+            ? done(state, { layouts: state.layouts })
+            : done(Object.freeze({ ...state, layouts: next }), {
+                  layouts: next,
+              });
+    },
+
+    "layouts.generate": (state, { breakpoint, from }) => {
+        knownBreakpoint(state, breakpoint);
+        if (from !== undefined) knownBreakpoint(state, from);
+        const layout = generateLayout({
+            layouts: state.layouts,
+            breakpoints: state.breakpoints,
+            target: breakpoint,
+            from,
+            rules: rulesAt(state, breakpoint),
+        });
+        return done(withLayoutAt(state, breakpoint, layout), { layout });
+    },
 };
+
+/** Whether two layouts hold different items (ids), whatever their places. */
+function otherItems(a: Layout | undefined, b: Layout | undefined): boolean {
+    if (!a || !b) return false;
+    if (a.length !== b.length) return true;
+    const ids = new Set(a.map((item) => item.id));
+    return b.some((item) => !ids.has(item.id));
+}
 
 /** The commands' names, for tools and guards (the naming test checks it lists every one). */
 export const COMMANDS = [
@@ -420,38 +731,87 @@ export const COMMANDS = [
     "item.place",
     "item.configure",
     "grid.configure",
+    "breakpoint.set",
+    "layouts.set",
+    "layouts.generate",
 ] as const satisfies readonly CommandName[];
 
 /** A grid layout's model, from its options (an invalid initial layout throws a `TypeError`). */
 export function createGridLayoutModel(
     options: GridLayoutModelOptions = {},
 ): GridLayoutModel {
+    let breakpoints: Breakpoints;
+    let columns: Readonly<Record<string, number>>;
     try {
         checkGridSettings(options);
+        breakpoints = Object.freeze({
+            ...checkBreakpoints(
+                options.breakpoints ?? { [DEFAULT_BREAKPOINT]: 0 },
+            ),
+        });
+        columns = columnsFor(breakpoints, options.cols ?? 12);
+        need(
+            options.breakpoint === undefined ||
+                Object.hasOwn(breakpoints, options.breakpoint),
+            `no breakpoint "${String(options.breakpoint)}"`,
+        );
     } catch (error) {
         throw new TypeError(
             `invalid options: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
+    // the widest breakpoint until the grid is measured
+    const breakpoint =
+        options.breakpoint ??
+        sortBreakpoints(breakpoints).at(-1) ??
+        DEFAULT_BREAKPOINT;
     const blank: GridLayoutState = {
-        cols: options.cols ?? 12,
+        cols: columns[breakpoint] ?? 12,
+        columns,
+        breakpoints,
         maxRows: options.maxRows ?? Number.POSITIVE_INFINITY,
         compactor: options.compactor ?? verticalCompactor,
         preventCollision: options.preventCollision === true,
         allowOverlap: options.allowOverlap === true,
-        breakpoint: DEFAULT_BREAKPOINT,
+        breakpoint,
         layouts: {},
     };
-    const first = normaliseLayout(options.layout ?? [], rulesOf(blank));
-    if (!first.ok) {
-        throw new TypeError(
-            `invalid layout: ${first.problems.map((problem) => problem.message).join("; ")}`,
-        );
+    const given: Record<string, Layout> = {
+        ...options.layouts,
+        ...(options.layout === undefined
+            ? {}
+            : { [breakpoint]: options.layout }),
+    };
+    const settled: Record<string, Layout> = {};
+    for (const [name, layout] of Object.entries(given)) {
+        if (!Object.hasOwn(breakpoints, name)) {
+            throw new TypeError(
+                `invalid options: layouts names no breakpoint "${name}"`,
+            );
+        }
+        const result = normaliseLayout(layout, rulesAt(blank, name));
+        if (!result.ok) {
+            throw new TypeError(
+                `invalid layout: ${result.problems.map((problem) => problem.message).join("; ")}`,
+            );
+        }
+        settled[name] = result.layout;
     }
-    let state: GridLayoutState = Object.freeze({
-        ...blank,
-        layouts: Object.freeze({ [DEFAULT_BREAKPOINT]: first.layout }),
-    });
+    let layouts: Readonly<Record<string, Layout>> = Object.freeze(settled);
+    // the starting breakpoint's layout, generated when only others are given (empty otherwise)
+    if (!layouts[breakpoint]) {
+        layouts = Object.freeze({
+            ...layouts,
+            [breakpoint]: generateLayout({
+                layouts,
+                breakpoints,
+                target: breakpoint,
+                from: undefined,
+                rules: rulesAt(blank, breakpoint),
+            }),
+        });
+    }
+    let state: GridLayoutState = Object.freeze({ ...blank, layouts });
     const middlewares: Middleware[] = [];
     const listeners = new Set<CommandListener>();
     const queue: { command: CommandName; payload: unknown }[] = [];
@@ -575,6 +935,19 @@ export function createGridLayoutModel(
                         });
                     }
                 }
+                // the active breakpoint without a layout: generated right after, as a command of
+                // its own (R3), from the one before it when it just became active
+                const active = state.breakpoint;
+                const switched = before.breakpoint !== active;
+                if (!state.layouts[active]) {
+                    queue.unshift({
+                        command: "layouts.generate",
+                        payload: {
+                            breakpoint: active,
+                            from: switched ? before.breakpoint : undefined,
+                        },
+                    });
+                }
             }
         } finally {
             running = false;
@@ -611,6 +984,12 @@ export function createGridLayoutModel(
         rules: () => rulesOf(state),
         breakpoint: () => state.breakpoint,
         layouts: () => state.layouts,
+        "layout-by": ({ breakpoint }) => state.layouts[breakpoint],
+        cols: () => state.cols,
+        "cols-by": ({ breakpoint }) => state.columns[breakpoint],
+        breakpoints: () => state.breakpoints,
+        "breakpoint-for": ({ width }) =>
+            breakpointFor(state.breakpoints, width) ?? state.breakpoint,
     };
 
     const questions: {

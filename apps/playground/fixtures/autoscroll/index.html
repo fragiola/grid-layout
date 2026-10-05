@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Auto-scroll fixture</title>
+        <style>
+            /* the fixture's own few lines: a short scroll container around a tall grid */
+            body { margin: 0; padding: 40px; font: 13px/1.2 system-ui, sans-serif; display: flex; gap: 24px; align-items: flex-start; }
+            [data-testid="scroller"] { width: 800px; height: 300px; overflow-y: auto; outline: 1px solid #888; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="resize-handle"] { position: absolute; inset-inline-end: 0; inset-block-end: 0; width: 14px; height: 14px; background: #333; }
+            [data-grid-layout-part="drag-source"] { width: 120px; height: 40px; outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 300px; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountAutoscrollFixture } from "../../src/fixture/autoscroll-fixture.tsx";
+            mountAutoscrollFixture();
+        </script>
+    </body>
+</html>

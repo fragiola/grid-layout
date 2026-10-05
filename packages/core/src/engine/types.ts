@@ -34,12 +34,20 @@ export type ExternalDragAnswer =
 export interface GridLayoutEngineOptions {
     /** a fixed width in pixels (server rendering, tests); without it the root is measured */
     width?: number | undefined;
-    /** one row's height in pixels (default 150) */
-    rowHeight?: number | undefined;
-    /** the space between items, `[inline, block]` in pixels (default `[10, 10]`) */
-    gap?: readonly [number, number] | undefined;
+    /** one row's height in pixels, for every breakpoint or each one (default 150) */
+    rowHeight?: PerBreakpoint<number> | undefined;
+    /**
+     * the space between items, `[inline, block]` in pixels, for every breakpoint or each one
+     * (default `[10, 10]`)
+     */
+    gap?: PerBreakpoint<readonly [number, number]> | undefined;
     /** the space between the root's edge and the items, `[inline, block]` (default: `gap`) */
-    padding?: readonly [number, number] | undefined;
+    padding?: PerBreakpoint<readonly [number, number]> | undefined;
+    /**
+     * the breakpoint, controlled: it overrides the one the grid's width gives (default: the
+     * width's, R1)
+     */
+    breakpoint?: string | undefined;
     /** the root's height follows the layout (default true) */
     autoSize?: boolean | undefined;
     /** whether people may drag items at all (default true; an item can say no for itself) */
@@ -50,6 +58,25 @@ export interface GridLayoutEngineOptions {
     bounded?: boolean | undefined;
     /** how far a press moves, in pixels, before it is a drag and no longer a click (default 3) */
     threshold?: number | undefined;
+    /**
+     * how long a touch on an item's body is held, in milliseconds, before it drags (default 250):
+     * a touch that moves sooner scrolls the page (R5); handles and sources start at once
+     */
+    touchDelay?: number | undefined;
+    /** how far, in pixels, a touch may move while it is held and still drag (default 5) */
+    touchTolerance?: number | undefined;
+    /**
+     * near the edge of the scroll container (the nearest scrollable ancestor, else the page), a
+     * gesture scrolls it (R6): within `threshold` pixels (default 40), up to `speed` pixels a
+     * frame (default 20); `false` never scrolls
+     */
+    autoScroll?:
+        | false
+        | {
+              readonly threshold?: number | undefined;
+              readonly speed?: number | undefined;
+          }
+        | undefined;
     /** the writing direction (default: the root's computed `direction`) */
     dir?: Direction | undefined;
     /**
@@ -64,6 +91,9 @@ export interface GridLayoutEngineOptions {
      */
     createId?: (() => string) | undefined;
 }
+
+/** A value for every breakpoint, or one per breakpoint (a breakpoint left out takes the default). */
+export type PerBreakpoint<T> = T | Readonly<Record<string, T>>;
 
 /** The writing direction: `x` counts from the inline-start edge, the right one in `rtl`. */
 export type Direction = "ltr" | "rtl";
@@ -110,6 +140,8 @@ export interface GestureView {
 export interface GridLayoutView {
     /** the measured (or given) width; 0 before the root is measured */
     readonly width: number;
+    /** the active breakpoint (the grid's width decides it, R1) */
+    readonly breakpoint: string;
     /** the root's height for the layout shown (with `autoSize`) */
     readonly height: number;
     readonly dir: Direction;

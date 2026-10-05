@@ -152,6 +152,46 @@ an implementation detail.
     `external: true`; pointer and native drops tell `drop-start`, `drop-over`, `drop`,
     `drop-cancel`. No name and no text in the primitives.
 
+### Responsive and mobile (Epic #13)
+
+21. **Container width, not viewport (R1).** The breakpoint is the widest whose minimum is at most
+    the grid's **own** measured width (React Grid Layout's must be exceeded: a recorded
+    deviation); never a viewport media query. `Root` takes `breakpoint` (controlled, it overrides
+    the width), `defaultBreakpoint` (before the grid is measured) and `onBreakpointChange(name,
+    cols)`, told once per change. A width wavering at a threshold settles (24 px past it to cross
+    back the threshold just crossed): no resize loop.
+22. **One model shape (R2).** The model holds `breakpoints`, `cols` per breakpoint and a layout
+    per breakpoint (one implicit `default` breakpoint without them). Commands `breakpoint.set`,
+    `layouts.set`, `layouts.generate`; `item.*` and `layout.set` take an optional `breakpoint`;
+    queries `cols`, `cols-by`, `layout-by`, `breakpoints`, `breakpoint-for`.
+    `onLayoutChange(layout, layouts)` keeps its first argument and adds every breakpoint's; it is
+    also told when the breakpoint changes (the active layout is another), never on mount for a
+    breakpoint change alone (`onBreakpointChange` tells that). A breakpoint change waits for a
+    gesture to end.
+23. **Generation (R3).** A breakpoint without a layout, made active, gets one right after as a
+    command of its own (`layouts.generate`, middleware and `onLayoutChange` see it): the nearest
+    larger breakpoint's layout, else the last active one's, settled in its columns (gaps
+    collapse). Every breakpoint shows the same items: one added or removed on a breakpoint is on
+    the others at their next activation (in the same `breakpoint.set`), each keeping its own
+    places. A `grid.configure` that drops the active breakpoint makes the widest one active.
+24. **Geometry per breakpoint (R4).** `gap`, `padding` and `rowHeight` take one value or one per
+    breakpoint; they are engine options, never stored in the model.
+25. **Touch activation (R5).** A touch on an item's **body** is held `touchDelay` (250 ms) within
+    `touchTolerance` (5 px) before it drags, `data-pressing` on the item meanwhile (written by the
+    engine on the item's element, not through the view, so a touch that turns out a scroll
+    renders nothing; style it with CSS, there is no state field); a touch that
+    moves first is let go, so the page scrolls. Handles, resize handles and drag sources start at
+    once (structural `touch-action: none`); item bodies get no `touch-action`. A touch that holds
+    an item never scrolls the page (a non-passive `touchmove` guard on the root) and opens no
+    long-press menu or selection. iOS's callout and selection styles (`-webkit-touch-callout`,
+    `user-select`) are the app's CSS, as any look (D5).
+26. **Edge auto-scroll (R6).** During a move, a resize or a drop from a drag source, near the
+    edge of the nearest scrollable ancestor along each axis (else the page), within
+    `autoScroll.threshold` (40 px, at most half the view) the engine scrolls up to
+    `autoScroll.speed` (20 px) a frame, faster the deeper; the preview follows; it stops out of
+    the zone, at the grid's end (half a held item past it, with `autoSize`) and with the gesture.
+    `autoScroll: false` turns it off. Native drags are the browser's to scroll.
+
 ## Commands
 
 | command | does |
@@ -164,7 +204,7 @@ an implementation detail.
 | `pnpm bench` | Vitest benchmarks (informative, not a gate) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages, Vite for the apps), then the `.d.ts` check |
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
-| `pnpm e2e` | Playwright: the playground (Chromium and Firefox) and the examples app (Chromium) |
+| `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and the examples app (Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
 | `pnpm dev` | the playground on <http://localhost:5173>: every example live, the fixtures (`PLAYGROUND_PORT` moves it) |
 | `pnpm site:export --base /grid-layout --out <dir>` | the site export for fragiola.com (contract v1.2, `../www/CONTRACT.md`), self-validated |
 | `pnpm site:dev --base /grid-layout --port 5182` | the examples app with hot reload, under the base `www` proxies in dev |
@@ -279,12 +319,12 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
   keyed by id.
 - **The parts** (`GridLayout.*`, each over its hook):
   - `Root` (`useGridLayout`, `useGridLayoutView`): a `div` positioned `relative`, as tall as the
-    layout with `autoSize`; `data-dragging`, `data-resizing`, `data-grabbed`, `data-dropping`,
-    `data-drop-refused`, `data-outside`. Its `dir` prop is the engine's direction and the
+    layout with `autoSize`; `data-breakpoint` (the active breakpoint's name), `data-dragging`,
+    `data-resizing`, `data-grabbed`, `data-dropping`, `data-drop-refused`, `data-outside`. Its `dir` prop is the engine's direction and the
     element's `dir`. It takes `gridLayoutRef`, `onExternalDrag`, `onDrop` and `createId`.
   - `Item` (`useItem`): placed by a `transform`; `data-item-id`, `data-dragging`,
-    `data-resizing`, `data-grabbed`, `data-outside`, `data-static`, `data-draggable`,
-    `data-resizable`. It is the
+    `data-resizing`, `data-grabbed`, `data-outside`, `data-pressing` (a touch holds it before it
+    drags; set by the engine on the element), `data-static`, `data-draggable`, `data-resizable`. It is the
     tab stop (`tabIndex` 0), or `-1` once it has a drag handle.
   - `DragHandle` (`useDragHandle`): the only place its item drags from once there is one, and the
     item's tab stop; `data-dragging`, `data-grabbed`, `data-draggable`.
@@ -301,6 +341,8 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
     the pointer by the engine (its `transform`); `data-over`, `data-drop-refused`; its children
     (or a function of its state, the drop's `data`) are the app's.
 - **The ref** (`createGridLayoutRef` / `useGridLayoutRef`): one mounted `Root` holds it at a time.
+- **`useBreakpoint()`** (or `useBreakpoint(gridLayoutRef)` from outside): `{ breakpoint, cols,
+  width }`.
 - **Presses and keys go to the engine after the consumer.** `Root` calls the engine's
   `pointerdown` and `keydown` after the consumer's `onPointerDown`/`onKeyDown` (on `Root` or its
   `render` element): `preventDefault` vetoes a gesture or replaces a key. During a pointer gesture,
