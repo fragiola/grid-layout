@@ -15,6 +15,8 @@ import {
 } from "../../src";
 
 let frames: FrameRequestCallback[] = [];
+/** a frame cancelled: it runs nothing and is not pending */
+const CANCELLED: FrameRequestCallback = () => {};
 let resize: (() => void) | undefined;
 /** what each grid set up in a test leaves behind: its engine stops listening to the document */
 const teardowns: (() => void)[] = [];
@@ -34,7 +36,7 @@ function stubBrowser(): void {
     });
     vi.stubGlobal("cancelAnimationFrame", (id: number) => {
         const index = id - 1;
-        if (frames[index]) frames[index] = () => {};
+        if (frames[index]) frames[index] = CANCELLED;
     });
     vi.stubGlobal(
         "ResizeObserver",
@@ -63,6 +65,11 @@ function stubBrowser(): void {
     proto.releasePointerCapture = function (this: Element, id: number) {
         captured.get(this)?.delete(id);
     };
+}
+
+/** How many animation frames are requested and not yet run. */
+export function pendingFrames(): number {
+    return frames.filter((frame) => frame !== CANCELLED).length;
 }
 
 /** Runs the animation frames requested so far. */

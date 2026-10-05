@@ -58,6 +58,25 @@ export interface GridLayoutEngineOptions {
     bounded?: boolean | undefined;
     /** how far a press moves, in pixels, before it is a drag and no longer a click (default 3) */
     threshold?: number | undefined;
+    /**
+     * how long a touch on an item's body is held, in milliseconds, before it drags (default 250):
+     * a touch that moves sooner scrolls the page (R5); handles and sources start at once
+     */
+    touchDelay?: number | undefined;
+    /** how far, in pixels, a touch may move while it is held and still drag (default 5) */
+    touchTolerance?: number | undefined;
+    /**
+     * near the edge of the scroll container (the nearest scrollable ancestor, else the page), a
+     * gesture scrolls it (R6): within `threshold` pixels (default 40), up to `speed` pixels a
+     * frame (default 20); `false` never scrolls
+     */
+    autoScroll?:
+        | false
+        | {
+              readonly threshold?: number | undefined;
+              readonly speed?: number | undefined;
+          }
+        | undefined;
     /** the writing direction (default: the root's computed `direction`) */
     dir?: Direction | undefined;
     /**
@@ -142,6 +161,8 @@ export interface GridLayoutView {
     readonly gesture: GestureView | undefined;
     /** the items that have a drag handle: they drag only from it, and it is their tab stop */
     readonly handled: ReadonlySet<string>;
+    /** the item a touch holds before it drags (R5): its `data-pressing` */
+    readonly pressing: string | undefined;
     /** whether people may drag and resize at all (the options) */
     readonly draggable: boolean;
     readonly resizable: boolean;

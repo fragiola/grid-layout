@@ -55,6 +55,11 @@ interface Settings {
     readonly resizable: boolean;
     readonly bounded: boolean;
     readonly threshold: number;
+    readonly touchDelay: number;
+    readonly touchTolerance: number;
+    readonly autoScroll:
+        | { readonly threshold: number; readonly speed: number }
+        | undefined;
     readonly dir: Direction | undefined;
     readonly onExternalDrag: GridLayoutEngineOptions["onExternalDrag"];
     readonly createId: GridLayoutEngineOptions["createId"];
@@ -72,6 +77,15 @@ function settingsOf(options: GridLayoutEngineOptions): Settings {
         resizable: options.resizable ?? true,
         bounded: options.bounded ?? false,
         threshold: options.threshold ?? 3,
+        touchDelay: options.touchDelay ?? 250,
+        touchTolerance: options.touchTolerance ?? 5,
+        autoScroll:
+            options.autoScroll === false
+                ? undefined
+                : {
+                      threshold: options.autoScroll?.threshold ?? 40,
+                      speed: options.autoScroll?.speed ?? 20,
+                  },
         dir: options.dir,
         onExternalDrag: options.onExternalDrag,
         createId: options.createId,
@@ -123,6 +137,14 @@ interface Session {
     /** the last pointer (or native drag) event, applied at the next frame */
     pending: MouseEvent | undefined;
     frame: number | undefined;
+    /** the last pointer event applied: where an auto-scroll recomputes the preview from */
+    last: MouseEvent | undefined;
+    /** the edge auto-scroll's frame, while it scrolls (R6) */
+    scrolling: number | undefined;
+    /** what scrolls each way, found once the gesture first nears an edge (`null`: nothing) */
+    scrollers: { x: Element | null; y: Element | null } | undefined;
+    /** a touch holds the item: the page must not scroll under it */
+    touch: boolean;
     /** removes what the session listens to */
     readonly cleanup: (() => void)[];
 }
@@ -136,6 +158,8 @@ interface Press {
     readonly element: HTMLElement;
     /** the gesture it becomes once the pointer passes the threshold */
     readonly drag: (move: PointerEvent) => void;
+    /** a touch on an item's body: it drags once held long enough, and scrolls if it moves first */
+    readonly held: boolean;
     readonly cleanup: (() => void)[];
 }
 
@@ -223,6 +247,8 @@ export function createGridLayoutEngine(
     let press: Press | undefined;
     /** a native drag over the root: how deep it is in the root's elements, and the app's answer */
     let native: { depth: number; answer: ExternalDragAnswer } | undefined;
+    /** the item a touch holds before it drags (R5) */
+    let pressing: string | undefined;
     /** the item a keyboard drop added: focused once its element is registered */
     let focusNext: string | undefined;
     /** ids made without `crypto.randomUUID` (an insecure context) */
@@ -372,6 +398,7 @@ export function createGridLayoutEngine(
             rects,
             gesture: session?.view,
             handled,
+            pressing,
             draggable: settings.draggable,
             resizable: settings.resizable,
             dropRefused:
@@ -403,6 +430,7 @@ export function createGridLayoutEngine(
             a.layout === b.layout &&
             a.gesture === b.gesture &&
             a.handled === b.handled &&
+            a.pressing === b.pressing &&
             a.draggable === b.draggable &&
             a.resizable === b.resizable &&
             a.dropRefused === b.dropRefused &&
@@ -694,6 +722,10 @@ export function createGridLayoutEngine(
             grab: { x: grab.x - startRect.left, y: grab.y - startRect.top },
             pending: undefined,
             frame: undefined,
+            last: undefined,
+            scrolling: undefined,
+            scrollers: undefined,
+            touch: false,
             cleanup: [],
         };
         session = current;
@@ -703,8 +735,12 @@ export function createGridLayoutEngine(
 
     /** Ends the session: the item drawn at rest again, and what it listened to removed. */
     function finish(current: Session): void {
-        if (current.frame !== undefined && root) {
-            root.ownerDocument.defaultView?.cancelAnimationFrame(current.frame);
+        if (root) {
+            const host = root.ownerDocument.defaultView;
+            if (current.frame !== undefined)
+                host?.cancelAnimationFrame(current.frame);
+            if (current.scrolling !== undefined)
+                host?.cancelAnimationFrame(current.scrolling);
         }
         for (const remove of current.cleanup) remove();
         session = undefined;
@@ -870,6 +906,7 @@ export function createGridLayoutEngine(
         const geometry = geometryOf();
         if (!event || !geometry || !root || session !== current) return;
         current.pending = undefined;
+        current.last = event;
         const box = root.getBoundingClientRect();
         const point = pointIn(event.clientX, event.clientY, box);
         const start = current.startRect;
@@ -938,6 +975,158 @@ export function createGridLayoutEngine(
         } else {
             emit(current.kind === "move" ? "drag" : "resize", current, event);
         }
+        autoScroll(current);
+    }
+
+    // ─── edge auto-scroll ───────────────────────────────────────────────────────────────────
+
+    /**
+     * The nearest ancestor of the root (or the root) that scrolls along an axis, else the page's
+     * scroller (`null` without one). Found once a gesture nears an edge, not every frame.
+     */
+    function scrollerOf(start: HTMLElement, axis: "x" | "y"): Element | null {
+        const host = start.ownerDocument.defaultView;
+        const page = start.ownerDocument.scrollingElement;
+        for (
+            let element: HTMLElement | null = start;
+            element && element !== page;
+            element = element.parentElement
+        ) {
+            const style = host?.getComputedStyle(element);
+            const overflow = axis === "y" ? style?.overflowY : style?.overflowX;
+            const room =
+                axis === "y"
+                    ? element.scrollHeight > element.clientHeight
+                    : element.scrollWidth > element.clientWidth;
+            if (
+                room &&
+                (overflow === "auto" ||
+                    overflow === "scroll" ||
+                    overflow === "overlay")
+            ) {
+                return element;
+            }
+        }
+        return page;
+    }
+
+    /**
+     * How far to scroll along one axis for a pointer at `at` between `start` and `end`: none
+     * outside the edge zones (each at most half the view, so they never overlap), more the
+     * deeper into one (the full speed past the edge), toward it.
+     */
+    function edgeStep(at: number, start: number, end: number): number {
+        const zone = settings.autoScroll;
+        if (!zone) return 0;
+        const threshold = Math.min(zone.threshold, (end - start) / 2);
+        if (threshold <= 0) return 0;
+        const ramp = (depth: number) =>
+            Math.ceil(
+                zone.speed * Math.min(1, Math.max(0, 1 - depth / threshold)),
+            );
+        if (at < start + threshold) return -ramp(at - start);
+        if (at > end - threshold) return ramp(end - at);
+        return 0;
+    }
+
+    /** A scroller's visible box: the viewport for the page's, else its own box within it. */
+    function visibleBox(scroller: Element, doc: Document) {
+        const view = doc.documentElement;
+        const page = {
+            top: 0,
+            left: 0,
+            bottom: view.clientHeight,
+            right: view.clientWidth,
+        };
+        if (scroller === doc.scrollingElement) return page;
+        const box = scroller.getBoundingClientRect();
+        return {
+            top: Math.max(box.top, page.top),
+            left: Math.max(box.left, page.left),
+            bottom: Math.min(box.bottom, page.bottom),
+            right: Math.min(box.right, page.right),
+        };
+    }
+
+    /** One axis's scroll for the pointer now, or 0 outside the edge zones (R6). */
+    function axisStep(current: Session, axis: "x" | "y"): number {
+        const at = current.pending ?? current.last;
+        const scroller = current.scrollers?.[axis];
+        if (!root || !at || !scroller) return 0;
+        const box = visibleBox(scroller, root.ownerDocument);
+        return axis === "y"
+            ? edgeStep(at.clientY, box.top, box.bottom)
+            : edgeStep(at.clientX, box.left, box.right);
+    }
+
+    /** Scrolls `scroller` by `delta` along `axis` at once; says whether it moved. */
+    function scrollAlong(
+        scroller: Element,
+        axis: "x" | "y",
+        delta: number,
+    ): boolean {
+        if (delta === 0) return false;
+        const before = axis === "y" ? scroller.scrollTop : scroller.scrollLeft;
+        // at once, whatever the page's `scroll-behavior`: the position is read back right after
+        if (typeof scroller.scrollBy === "function") {
+            scroller.scrollBy({
+                [axis === "y" ? "top" : "left"]: delta,
+                behavior: "instant",
+            });
+        } else if (axis === "y") scroller.scrollTop = before + delta;
+        else scroller.scrollLeft = before + delta;
+        return (
+            (axis === "y" ? scroller.scrollTop : scroller.scrollLeft) !== before
+        );
+    }
+
+    /**
+     * Near the scroll container's edge, scrolls it a frame at a time, the preview following the
+     * pointer (R6); stops once out of the zone, at the end, or with the gesture. A native drag is
+     * the browser's to scroll.
+     */
+    function autoScroll(current: Session): void {
+        const host = root?.ownerDocument.defaultView;
+        if (
+            !root ||
+            !host ||
+            !settings.autoScroll ||
+            current.source === "native" ||
+            current.scrolling !== undefined
+        ) {
+            return;
+        }
+        current.scrollers ??= {
+            x: scrollerOf(root, "x"),
+            y: scrollerOf(root, "y"),
+        };
+        if (axisStep(current, "x") === 0 && axisStep(current, "y") === 0)
+            return;
+        current.scrolling = host.requestAnimationFrame(() => {
+            current.scrolling = undefined;
+            const scrollers = current.scrollers;
+            if (session !== current || !scrollers) return;
+            // where the pointer is now: it may have left the zone since
+            const movedX =
+                scrollers.x !== null &&
+                scrollAlong(scrollers.x, "x", axisStep(current, "x"));
+            const movedY =
+                scrollers.y !== null &&
+                scrollAlong(scrollers.y, "y", axisStep(current, "y"));
+            // at the end: nothing moved, and nothing more to do until the pointer moves
+            if (!movedX && !movedY) return;
+            // the preview follows: from a newer pointer position when one waits for its frame
+            current.pending ??= current.last;
+            frame(current);
+        });
+    }
+
+    /** What a touch holding an item stops: a long press's menu and text selection. */
+    function holdTouch(doc: Document): (() => void)[] {
+        return [
+            listen(doc, "contextmenu", (menu) => menu.preventDefault()),
+            listen(doc, "selectstart", (select) => select.preventDefault()),
+        ];
     }
 
     /**
@@ -1012,6 +1201,7 @@ export function createGridLayoutEngine(
             // no text selection while an item is dragged, and no native drag of one
             listen(doc, "selectstart", (select) => select.preventDefault()),
             listen(doc, "dragstart", (native) => native.preventDefault()),
+
             () => {
                 try {
                     if (capture.hasPointerCapture(pointerId)) {
@@ -1022,6 +1212,11 @@ export function createGridLayoutEngine(
                 }
             },
         );
+        // a touch drag is not a page scroll (the root's touchmove guard) and opens no menu
+        if (event.pointerType === "touch") {
+            current.touch = true;
+            current.cleanup.push(...holdTouch(doc));
+        }
         emit(type, current, event);
         current.pending = event;
         frame(current);
@@ -1067,19 +1262,40 @@ export function createGridLayoutEngine(
         event: PointerEvent,
         element: HTMLElement,
         drag: (down: Press, move: PointerEvent) => void,
+        heldItem?: string,
     ): void {
         if (!root) return;
         endPress();
         const doc = root.ownerDocument;
+        const host = doc.defaultView;
         const down: Press = {
             pointerId: event.pointerId,
             x: event.clientX,
             y: event.clientY,
             element,
             drag: (move) => drag(down, move),
+            held: heldItem !== undefined,
             cleanup: [],
         };
         press = down;
+        if (heldItem !== undefined && host) {
+            // a touch on an item's body: held long enough, it drags from where it is (R5)
+            pressing = heldItem;
+            update();
+            const timer = host.setTimeout(() => {
+                if (press !== down) return;
+                endPress();
+                down.drag(event);
+            }, settings.touchDelay);
+            down.cleanup.push(
+                () => host.clearTimeout(timer),
+                ...holdTouch(doc),
+                () => {
+                    pressing = undefined;
+                    update();
+                },
+            );
+        }
         down.cleanup.push(
             // the browser's own drag (a selection, an image) would cancel the pointer: the press
             // is the grid's until it ends or turns out to be a click
@@ -1095,6 +1311,12 @@ export function createGridLayoutEngine(
                     move.clientX - down.x,
                     move.clientY - down.y,
                 );
+                if (down.held) {
+                    // a touch that moves before it is held long enough scrolls the page: the
+                    // grid lets it go
+                    if (distance > settings.touchTolerance) endPress();
+                    return;
+                }
                 if (distance < settings.threshold) return;
                 endPress();
                 down.drag(move);
@@ -1115,6 +1337,8 @@ export function createGridLayoutEngine(
               itemId: string;
               side?: ResizeSide;
               element: HTMLElement;
+              /** the item's body, not a handle: a touch there is held before it drags */
+              body?: boolean;
           }
         | undefined {
         for (
@@ -1134,7 +1358,7 @@ export function createGridLayoutEngine(
                 const hasHandle = handled.has(itemId);
                 return hasHandle
                     ? undefined
-                    : { kind: "move", itemId, element: html };
+                    : { kind: "move", itemId, element: html, body: true };
             }
             if (html.matches(DRAG_EXEMPT)) return undefined;
         }
@@ -1159,22 +1383,29 @@ export function createGridLayoutEngine(
                 : settings.resizable &&
                   model.is("item-resizable-by", { itemId: pressed.itemId });
         if (!allowedHere) return;
-        pressOn(event, pressed.element, (down, move) => {
-            const before = model.get("item-by", { itemId: pressed.itemId });
-            if (!before) return;
-            const current = begin(pressed.kind, "pointer", before, {
-                side: pressed.side,
-                pointer: { id: down.pointerId, x: down.x, y: down.y },
-                element: items.get(pressed.itemId),
-            });
-            if (!current) return;
-            follow(
-                current,
-                down.element,
-                move,
-                pressed.kind === "move" ? "drag-start" : "resize-start",
-            );
-        });
+        pressOn(
+            event,
+            pressed.element,
+            (down, move) => {
+                const before = model.get("item-by", { itemId: pressed.itemId });
+                if (!before) return;
+                const current = begin(pressed.kind, "pointer", before, {
+                    side: pressed.side,
+                    pointer: { id: down.pointerId, x: down.x, y: down.y },
+                    element: items.get(pressed.itemId),
+                });
+                if (!current) return;
+                follow(
+                    current,
+                    down.element,
+                    move,
+                    pressed.kind === "move" ? "drag-start" : "resize-start",
+                );
+            },
+            event.pointerType === "touch" && pressed.body
+                ? pressed.itemId
+                : undefined,
+        );
     }
 
     // ─── drops from outside ─────────────────────────────────────────────────────────────────
@@ -1607,6 +1838,16 @@ export function createGridLayoutEngine(
         adapter: {
             attach(element) {
                 root = element;
+                // there from a touch's start, as a phone requires to let it be cancelled: a touch
+                // that holds an item never scrolls the page (R5); any other touch scrolls it
+                const unguard = listen(
+                    element,
+                    "touchmove",
+                    (touch) => {
+                        if (session?.touch) touch.preventDefault();
+                    },
+                    { passive: false },
+                );
                 measured = Math.round(element.clientWidth);
                 readDirection();
                 resolveBreakpoint();
@@ -1630,6 +1871,7 @@ export function createGridLayoutEngine(
                     : undefined;
                 observer?.observe(element);
                 return () => {
+                    unguard();
                     observer?.disconnect();
                     if (frameId !== undefined)
                         host?.cancelAnimationFrame(frameId);
