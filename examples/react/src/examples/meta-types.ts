@@ -15,6 +15,8 @@ export const CATEGORIES = [
     "compaction",
     "keyboard",
     "external-drop",
+    "responsive",
+    "mobile",
     "styling",
     "apps",
 ] as const;
@@ -29,6 +31,8 @@ export const CATEGORY_TITLES: Record<Category, string> = {
     compaction: "Compaction",
     keyboard: "Keyboard",
     "external-drop": "External drop",
+    responsive: "Responsive",
+    mobile: "Mobile",
     styling: "Styling",
     apps: "Apps",
 };
@@ -68,6 +72,8 @@ export const DEFAULT_HEIGHT: Record<Category, number> = {
     compaction: 520,
     keyboard: 480,
     "external-drop": 540,
+    responsive: 560,
+    mobile: 720,
     styling: 480,
     apps: 600,
 };
