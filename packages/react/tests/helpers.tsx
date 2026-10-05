@@ -5,13 +5,15 @@ import { act } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 let frames: FrameRequestCallback[] = [];
+const boxOf = HTMLElement.prototype.getBoundingClientRect;
 
 afterEach(() => {
     frames = [];
     vi.unstubAllGlobals();
+    HTMLElement.prototype.getBoundingClientRect = boxOf;
 });
 
-/** Fakes animation frames and pointer capture; call it before rendering a grid. */
+/** Fakes animation frames, pointer capture and the root's box; call it before rendering a grid. */
 export function stubBrowser(): void {
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
         frames.push(callback);
@@ -22,6 +24,17 @@ export function stubBrowser(): void {
     proto.setPointerCapture = () => {};
     proto.hasPointerCapture = () => false;
     proto.releasePointerCapture = () => {};
+    // a root on screen: at the viewport's corner, as wide as the tests' grid, as tall as its style
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+        return this.getAttribute("data-grid-layout-part") === "root"
+            ? new DOMRect(
+                  0,
+                  0,
+                  GEOMETRY.width,
+                  Number.parseFloat(this.style.height) || 0,
+              )
+            : boxOf.call(this);
+    };
 }
 
 /** Runs the animation frames requested so far, inside `act`. */

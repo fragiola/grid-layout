@@ -38,18 +38,34 @@
                     "label": "State attributes",
                     "path": "concepts/state-attributes"
                 },
-                { "label": "Layout items", "path": "concepts/layout-items" },
+                {
+                    "label": "Layout items",
+                    "path": "concepts/layout-items"
+                },
                 {
                     "label": "Collisions and compaction",
                     "path": "concepts/collisions-and-compaction"
                 },
-                { "label": "Dragging", "path": "concepts/dragging" },
-                { "label": "Resizing", "path": "concepts/resizing" },
+                {
+                    "label": "Dragging",
+                    "path": "concepts/dragging"
+                },
+                {
+                    "label": "Resizing",
+                    "path": "concepts/resizing"
+                },
+                {
+                    "label": "External drop",
+                    "path": "concepts/external-drop"
+                },
                 {
                     "label": "Keyboard and accessibility",
                     "path": "concepts/keyboard-and-accessibility"
                 },
-                { "label": "Right-to-left", "path": "concepts/rtl" }
+                {
+                    "label": "Right-to-left",
+                    "path": "concepts/rtl"
+                }
             ]
         },
         {
@@ -69,17 +85,27 @@
                     "label": "Transitions and the placeholder",
                     "path": "guides/transitions-and-placeholder"
                 },
-                { "label": "Saving a layout", "path": "guides/persistence" },
+                {
+                    "label": "Saving a layout",
+                    "path": "guides/persistence"
+                },
                 {
                     "label": "Content inside items",
                     "path": "guides/content-inside-items"
+                },
+                {
+                    "label": "A widget sidebar",
+                    "path": "guides/widget-sidebar"
                 }
             ]
         },
         {
             "label": "Project",
             "pages": [
-                { "label": "Limitations and roadmap", "path": "limitations" }
+                {
+                    "label": "Limitations and roadmap",
+                    "path": "limitations"
+                }
             ]
         }
     ]

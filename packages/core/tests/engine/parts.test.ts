@@ -38,6 +38,7 @@ function view(over: Partial<GridLayoutView> = {}): GridLayoutView {
         },
         gesture: undefined,
         handled: new Set(),
+        dropRefused: false,
         draggable: true,
         resizable: true,
         ...over,
@@ -49,6 +50,9 @@ describe("the parts", () => {
         expect(rootPart(view())).toEqual({
             state: {
                 dragging: false,
+                dropping: false,
+                dropRefused: false,
+                outside: false,
                 resizing: false,
                 grabbed: false,
                 dir: "ltr",
@@ -131,6 +135,10 @@ describe("the parts", () => {
             before: a,
             preview: [a, s],
             placeholder: { left: 205, top: 70, width: 185, height: 50 },
+            outside: false,
+            refused: false,
+            data: undefined,
+            origin: undefined,
         };
         const during = view({ gesture });
         expect(placeholderPart(during)).toEqual({

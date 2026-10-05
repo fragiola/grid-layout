@@ -60,7 +60,12 @@ items per preview. The fast compactors of Epic #18 address large layouts.
 10. **No child-key synchronisation** (`data-grid`), no `WidthProvider`, no stylesheet, no
    `react-draggable` or `react-resizable`, no legacy API: the model is the source of truth, the root
    measures itself, and the look is the app's.
-11. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
+11. **An item dragged off the grid goes back** (added by Epic #9, X3). Once the held item's
+    centre leaves the root (past its sides or its top, or further below its bottom than its own
+    height with `autoSize`), the preview returns it to its cell and a release there runs no
+    command. `drag-stop` reports `outside` and the element under the pointer, so the app can remove
+    it. React Grid Layout clamps the item to the edge cell. A `bounded` grid never lets an item out.
+12. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
     logical sides and right-to-left, middleware that can refuse a gesture's landing (the preview
     shows the item going back), and `item.place` for a move and a resize at once.
 

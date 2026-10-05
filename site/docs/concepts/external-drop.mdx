@@ -1,0 +1,145 @@
+---
+title: External drop
+description: Bring new items in from outside the grid by pointer, keyboard or a file from another window, and report items dragged out of it.
+---
+
+Things from outside the grid can become items: a sidebar of widgets, a toolbox of removed ones,
+files from the computer. There are three ways in, and they all end the same way.
+
+- A **drag source** (`GridLayout.DragSource`), pressed and dragged with a mouse, a finger or a pen.
+- The same drag source **from the keyboard**: Enter or Space brings its item in, already grabbed.
+- A **native drag** from another window (files, links, text), answered by `onExternalDrag`.
+
+Over the grid, the new item takes the cell under the pointer and pushes the others aside, exactly
+as a move does. Dropped, it is **one `item.add`** through the model's middleware.
+
+## A drag source
+
+A source can sit anywhere on the page. Outside the root, it reaches the grid through a
+`gridLayoutRef`; inside the root, it needs none.
+
+```tsx title="sidebar.tsx"
+const gridLayoutRef = useGridLayoutRef();
+
+<aside>
+    <GridLayout.DragSource
+        gridLayoutRef={gridLayoutRef}
+        item={{ w: 4, h: 3, minW: 2 }}
+        data={{ kind: "chart" }}
+        aria-label="Chart widget"
+    >
+        Chart
+    </GridLayout.DragSource>
+</aside>
+<GridLayout.Root gridLayoutRef={gridLayoutRef} onDrop={({ item, data }) => remember(item.id, data)}>
+    …
+</GridLayout.Root>
+```
+
+A source gives the new item's size and limits (`item`), never its cell. It can name the new item's
+id (`itemId`). Otherwise the root's `createId` makes one when the drop begins, and without that a
+random UUID is used.
+It can carry `data`, which is yours: it comes back in the gesture's events and in `onDrop`, on
+the root and on the source.
+
+The layout never holds `data`. An item is its id and its box; keep what each id shows in your
+own state, as the examples do.
+
+## The preview is the drop
+
+While the source is over the grid, the preview is the model's own dry run of the `item.add` the
+drop would run. Nothing enters the model and `onLayoutChange` is not called until the drop, and
+the drop commits exactly what was shown, middleware included.
+
+The item is centred under the pointer, moved by the source's `dragOffset` when it has one. It
+stays inside the root with `bounded`, and follows right-to-left. Off the grid, the preview
+disappears; released there, nothing is added. Escape gives up.
+
+## Rules
+
+Every drop runs through your middleware, in its dry run and on the drop alike. A middleware can
+refuse a drop, rewrite its size or give it an id. A refused preview shows refused: the root gets
+`data-drop-refused` and the placeholder disappears.
+
+```ts title="rules.ts"
+model.use((ctx, next) => {
+    // without a cell, `item.add` takes the first free one: count it from column 0
+    if (ctx.command === "item.add" && (ctx.payload.item.x ?? 0) + ctx.payload.item.w > 9) {
+        return veto("The last three columns are locked.");
+    }
+    return next();
+});
+```
+
+<Example id="drop-rules" />
+
+## From the keyboard
+
+A drag source is a tab stop.
+
+| key | what it does |
+| --- | --- |
+| Enter or Space | brings the item into the grid at the first free cell, already grabbed |
+| Arrows, Shift + arrows | place it and size it, as for any grabbed item |
+| Enter or Space | adds it: one `item.add`, and the focus moves to the new item |
+| Escape or Tab | leaves it out |
+
+The grid tells each step as it does for its own items (`grab`, `move`, `resize`, `drop`,
+`cancel`), with `external: true`, so you announce them the same way.
+
+## Files and other windows
+
+A native drag from another window or from the computer goes through the root's
+`onExternalDrag`. It is called when the drag enters the grid and again on the drop, when files can
+be read.
+
+```tsx title="files.tsx"
+<GridLayout.Root
+    onExternalDrag={(event) =>
+        event.dataTransfer?.types.includes("Files")
+            ? { w: 3, h: 2, data: [...(event.dataTransfer?.files ?? [])].map((file) => file.name) }
+            : false
+    }
+    onDrop={({ item, data }) => addCard(item.id, data)}
+>
+```
+
+It returns the item to drop and its `data`, `false` to refuse the drag (the root gets
+`data-drop-refused`), or `undefined` to let it pass. The answer on the drop can still refuse, and
+gives the drop's data. The size stays the one shown.
+
+<Example id="drop-files" />
+
+## Dragging out
+
+An item dragged off the grid goes back in the preview (`data-outside` on the item and the root),
+and released there it runs no command. `onDragStop` reports it with `outside: true` and `target`,
+the element under the pointer. Removing the item, or keeping it in a toolbox, is yours.
+
+```tsx title="trash.tsx"
+<GridLayout.Root
+    onDragStop={(event) => {
+        if (event.outside && trash.current?.contains(event.target)) remove(event.itemId);
+    }}
+>
+```
+
+A `bounded` grid never lets an item out.
+
+<Example id="toolbox" />
+
+## The drag preview
+
+What follows the pointer while it brings an item is yours: `GridLayout.DragPreview` renders only
+then, and the grid keeps it at the pointer. Its children can be a function of its state, which
+holds the drop's `data`; `data-over` tells it the pointer is over the grid.
+
+```tsx title="preview.tsx"
+<GridLayout.DragPreview gridLayoutRef={gridLayoutRef} className="drag-card">
+    {(state) => titleOf(state.data)}
+</GridLayout.DragPreview>
+```
+
+It is placed with `position: fixed`: keep it out of an ancestor with a `transform`.
+
+<Example id="drag-from-outside" />

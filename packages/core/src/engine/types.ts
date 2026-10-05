@@ -4,6 +4,32 @@
 import type { GridGeometry, PixelRect } from "../layout/geometry";
 import type { Layout, LayoutItem, ResizeSide } from "../layout/types";
 
+/** What a drag source brings into the grid: the new item's size and limits, never its cell. */
+export type DropItem = Pick<LayoutItem, "w" | "h"> &
+    Partial<Pick<LayoutItem, "minW" | "maxW" | "minH" | "maxH">>;
+
+/** A drop from outside the grid: the item it adds, its id, and the app's own data. */
+export interface ExternalDrop {
+    readonly item: DropItem;
+    /** the new item's id (default: the `createId` option's, else a random UUID, made when the drop begins) */
+    readonly itemId?: string | undefined;
+    /** the app's own data: opaque, told back in the gesture's events and the drop */
+    readonly data?: unknown;
+    /** where the item sits from the pointer, in pixels on screen (default: centred under it) */
+    readonly dragOffset?:
+        | { readonly x: number; readonly y: number }
+        | undefined;
+}
+
+/**
+ * What `onExternalDrag` answers for a native drag (files, links, text from another window): the
+ * item to drop and its data, `false` to refuse it, `undefined` to let it pass.
+ */
+export type ExternalDragAnswer =
+    | (DropItem & { readonly data?: unknown })
+    | false
+    | undefined;
+
 /** How a grid on screen measures, moves and resizes. */
 export interface GridLayoutEngineOptions {
     /** a fixed width in pixels (server rendering, tests); without it the root is measured */
@@ -26,19 +52,37 @@ export interface GridLayoutEngineOptions {
     threshold?: number | undefined;
     /** the writing direction (default: the root's computed `direction`) */
     dir?: Direction | undefined;
+    /**
+     * a native drag entering the root (files, links, text from another window): the item to drop,
+     * `false` to refuse, `undefined` to ignore. Asked again on the drop, when the files can be
+     * read: that answer can refuse, and gives the drop's data; the size stays the one shown
+     */
+    onExternalDrag?: ((event: DragEvent) => ExternalDragAnswer) | undefined;
+    /**
+     * a new id for an item dropped from outside without one, made when its drop begins (default:
+     * a random UUID from the root's window)
+     */
+    createId?: (() => string) | undefined;
 }
 
 /** The writing direction: `x` counts from the inline-start edge, the right one in `rtl`. */
 export type Direction = "ltr" | "rtl";
 
-/** What is changing an item: a pointer (mouse, touch or pen) or the keyboard. */
-export type GestureSource = "pointer" | "keyboard";
+/**
+ * What is changing an item: a pointer (mouse, touch or pen), the keyboard, or a native drag from
+ * another window.
+ */
+export type GestureSource = "pointer" | "keyboard" | "native";
 
 /** A gesture on screen: the item, what it does, and where it would land. */
 export interface GestureView {
-    /** `move` and `resize` follow a pointer; `keyboard` is a grabbed item the keys move and size */
-    readonly kind: "move" | "resize" | "keyboard";
+    /**
+     * `move` and `resize` follow a pointer; `keyboard` is a grabbed item the keys move and size;
+     * `drop` is a new item coming from outside the grid
+     */
+    readonly kind: "move" | "resize" | "keyboard" | "drop";
     readonly source: GestureSource;
+    /** the held item; a drop's is the id it lands with (the source's `itemId`, or a new one) */
     readonly itemId: string;
     /** the side a pointer resize pulls */
     readonly side: ResizeSide | undefined;
@@ -48,6 +92,14 @@ export interface GestureView {
     readonly preview: Layout;
     /** where the item would land, in pixels: what a placeholder shows */
     readonly placeholder: PixelRect;
+    /** the pointer is off the grid: a move goes back to its cell, a drop adds nothing */
+    readonly outside: boolean;
+    /** the model refuses the drop where it is (a middleware, a collision) */
+    readonly refused: boolean;
+    /** a drop's data, as its source gave it */
+    readonly data: unknown;
+    /** the drag source a drop started from (`undefined` for a native drag and the grid's own) */
+    readonly origin: HTMLElement | undefined;
 }
 
 /**
@@ -80,13 +132,17 @@ export interface GridLayoutView {
     /** whether people may drag and resize at all (the options) */
     readonly draggable: boolean;
     readonly resizable: boolean;
+    /** an external drag over the grid that would not drop: `onExternalDrag` or the model said no */
+    readonly dropRefused: boolean;
 }
 
 /** What `engine.subscribe` receives: a gesture's steps, for callbacks and announcements. */
 export interface GestureEvent {
     /**
      * a pointer: `drag-start`, `drag`, `drag-stop`, `resize-start`, `resize`, `resize-stop`;
-     * the keyboard: `grab`, `move`, `resize`, `drop`; either: `cancel` (the layout is restored)
+     * the keyboard: `grab`, `move`, `resize`, `drop`; either: `cancel` (the layout is restored).
+     * A drop from outside by pointer or native drag: `drop-start`, `drop-over`, `drop`,
+     * `drop-cancel`; by keyboard, the keyboard's, with `external`
      */
     readonly type:
         | "drag-start"
@@ -98,8 +154,12 @@ export interface GestureEvent {
         | "grab"
         | "move"
         | "drop"
-        | "cancel";
+        | "cancel"
+        | "drop-start"
+        | "drop-over"
+        | "drop-cancel";
     readonly source: GestureSource;
+    /** the held item; a drop's is the id it lands with */
     readonly itemId: string;
     /** the layout now: the preview during a gesture, the committed one when it ends */
     readonly layout: Layout;
@@ -109,6 +169,16 @@ export interface GestureEvent {
     readonly item: LayoutItem;
     /** the native event behind it, when there is one */
     readonly nativeEvent: Event | undefined;
+    /** a drop from outside the grid */
+    readonly external: boolean;
+    /** a drop's data, as its source (or `onExternalDrag`) gave it */
+    readonly data: unknown;
+    /** the pointer is off the grid: a move released there runs no command */
+    readonly outside: boolean;
+    /** a move released off the grid: the element under the pointer (a trash); `null` otherwise */
+    readonly target: Element | null;
+    /** the drag source a drop started from (`undefined` for a native drag and the grid's own) */
+    readonly origin: HTMLElement | undefined;
 }
 
 export type GestureListener = (event: GestureEvent) => void;
@@ -173,6 +243,27 @@ export interface GridLayoutEngineAdapter {
     keydown(event: KeyboardEvent): void;
     /** the options, on every render */
     setOptions(options: GridLayoutEngineOptions): void;
+    /** a press on a drag source, after the app's own handler: past the threshold, a drop begins */
+    startExternalDrag(
+        event: PointerEvent,
+        source: HTMLElement,
+        drop: ExternalDrop,
+    ): void;
+    /** a key on a drag source, after the app's own handler: Space or Enter grabs a new item */
+    startExternalGrab(
+        event: KeyboardEvent,
+        source: HTMLElement,
+        drop: ExternalDrop,
+    ): void;
+    /** a drag source leaving the page: a drop it started ends, unapplied */
+    releaseSource(source: HTMLElement): void;
+    /** the drag preview's element: the engine keeps it at the pointer; returns its unregisterer */
+    registerDragPreview(element: HTMLElement): () => void;
+    /** a native drag over the root */
+    dragenter(event: DragEvent): void;
+    dragover(event: DragEvent): void;
+    dragleave(event: DragEvent): void;
+    drop(event: DragEvent): void;
 }
 
 /** One grid on screen: what the app reads and runs, and the adapter's side. */

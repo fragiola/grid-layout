@@ -9,7 +9,11 @@ export {
 export { createGridLayoutEngine } from "./engine/engine";
 export {
     type DragHandleState,
+    type DragPreviewState,
+    type DragSourceState,
     dragHandlePart,
+    dragPreviewPart,
+    dragSourcePart,
     type ItemState,
     itemPart,
     type Part,
@@ -23,9 +27,12 @@ export {
 } from "./engine/parts";
 export type {
     Direction,
+    DropItem,
     EngineActionMap,
     EngineQueryMap,
     EngineQuestionMap,
+    ExternalDragAnswer,
+    ExternalDrop,
     GestureEvent,
     GestureListener,
     GestureSource,

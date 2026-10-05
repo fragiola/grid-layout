@@ -2,7 +2,7 @@
 import type { Layout } from "@fragiola/grid-layout";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { GridLayout } from "../src";
+import { createGridLayoutRef, GridLayout } from "../src";
 
 const layout: Layout = [{ id: "a", x: 1, y: 0, w: 2, h: 1 }];
 
@@ -37,5 +37,22 @@ describe("server rendering", () => {
     it("places items when given a width", () => {
         const html = renderToString(<Grid width={1200} />);
         expect(html).toContain("translate(109px, 10px)");
+    });
+
+    it("renders a drag source outside a root, and no drag preview", () => {
+        const gridLayoutRef = createGridLayoutRef();
+        const html = renderToString(
+            <>
+                <GridLayout.DragSource
+                    gridLayoutRef={gridLayoutRef}
+                    item={{ w: 1, h: 1 }}
+                />
+                <GridLayout.DragPreview gridLayoutRef={gridLayoutRef} />
+                <Grid width={1200} />
+            </>,
+        );
+        expect(html).toContain('data-grid-layout-part="drag-source"');
+        expect(html).toContain('tabindex="0"');
+        expect(html).not.toContain("drag-preview");
     });
 });

@@ -6,6 +6,7 @@ import {
     createGridLayoutEngine,
     createGridLayoutModel,
     type Direction,
+    type ExternalDragAnswer,
     type GestureEvent,
     type GridLayoutEngine,
     type GridLayoutModel,
@@ -28,6 +29,8 @@ import {
     useSyncExternalStore,
 } from "react";
 import { GridLayoutContext, ViewContext } from "./context";
+import { attachGridLayoutRef, type GridLayoutRef } from "./gridLayoutRef";
+import { type DropDetails, dropDetailsOf } from "./hooks";
 import { type DivPrimitiveProps, useRenderElement } from "./utils/useRender";
 
 export type { RootState };
@@ -35,7 +38,7 @@ export type { RootState };
 /** A gesture's step, as the `onDrag*` and `onResize*` callbacks receive it. */
 export type GestureCallback = (event: GestureEvent) => void;
 
-export type RootProps = DivPrimitiveProps<RootState> & {
+export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     /** the items, controlled; pair it with `onLayoutChange` */
     layout?: Layout | undefined;
     /** the items to start with, uncontrolled */
@@ -81,6 +84,21 @@ export type RootProps = DivPrimitiveProps<RootState> & {
     onResizeStart?: GestureCallback | undefined;
     onResize?: GestureCallback | undefined;
     onResizeStop?: GestureCallback | undefined;
+    /**
+     * the grid, reachable from outside the root: its `current` is `{ model, engine }` while this
+     * root is mounted (from `useGridLayoutRef()` or `createGridLayoutRef()`)
+     */
+    gridLayoutRef?: GridLayoutRef | undefined;
+    /**
+     * a native drag over the root (files, links, text from another window): the item to drop,
+     * `false` to refuse it, `undefined` to ignore it. Asked again on the drop, when the files can
+     * be read: that answer can refuse, and gives the drop's data
+     */
+    onExternalDrag?: ((event: DragEvent) => ExternalDragAnswer) | undefined;
+    /** an item from outside was added (by a drag source or a native drag) */
+    onDrop?: ((drop: DropDetails) => void) | undefined;
+    /** a new id for an item dropped without one (default: a random UUID) */
+    createId?: (() => string) | undefined;
     children?: ReactNode;
 };
 
@@ -150,6 +168,10 @@ export function Root(props: RootProps) {
         onResizeStart: _onResizeStart,
         onResize: _onResize,
         onResizeStop: _onResizeStop,
+        gridLayoutRef,
+        onExternalDrag,
+        onDrop: _onDrop,
+        createId,
         children,
         ...rest
     } = props;
@@ -195,6 +217,8 @@ export function Root(props: RootProps) {
             bounded,
             threshold,
             dir,
+            onExternalDrag,
+            createId,
         });
     });
 
@@ -202,6 +226,17 @@ export function Root(props: RootProps) {
         engine.adapter.subscribe,
         engine.adapter.getView,
         engine.adapter.getView,
+    );
+
+    const context = useMemo(() => ({ model, engine }), [model, engine]);
+    // outside the root, the grid is reachable once it is mounted (X5), first: the callbacks the
+    // effects below may call find it
+    useLayoutEffect(
+        () =>
+            gridLayoutRef
+                ? attachGridLayoutRef(gridLayoutRef, context)
+                : undefined,
+        [gridLayoutRef, context],
     );
 
     // controlled: a change the parent does not take is undone at its next render, which this
@@ -227,6 +262,10 @@ export function Root(props: RootProps) {
     useLayoutEffect(
         () =>
             engine.subscribe((event) => {
+                if (event.type === "drop" && event.external) {
+                    latest.current.onDrop?.(dropDetailsOf(event));
+                    return;
+                }
                 const name = CALLBACKS[event.type];
                 const callback = name ? latest.current[name] : undefined;
                 if (typeof callback === "function")
@@ -313,10 +352,16 @@ export function Root(props: RootProps) {
                 engine.adapter.pointerdown(event.nativeEvent),
             onKeyDown: (event: React.KeyboardEvent) =>
                 engine.adapter.keydown(event.nativeEvent),
+            onDragEnter: (event: React.DragEvent) =>
+                engine.adapter.dragenter(event.nativeEvent),
+            onDragOver: (event: React.DragEvent) =>
+                engine.adapter.dragover(event.nativeEvent),
+            onDragLeave: (event: React.DragEvent) =>
+                engine.adapter.dragleave(event.nativeEvent),
+            onDrop: (event: React.DragEvent) =>
+                engine.adapter.drop(event.nativeEvent),
         },
     });
-
-    const context = useMemo(() => ({ model, engine }), [model, engine]);
     return (
         <GridLayoutContext.Provider value={context}>
             <ViewContext.Provider value={view}>{element}</ViewContext.Provider>

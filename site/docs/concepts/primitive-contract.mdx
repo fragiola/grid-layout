@@ -13,7 +13,8 @@ Every part follows the same rules.
 - **`className` and `style` take a value or a function of the state.** Your style sits under the
   part's structural style.
 - **Structural inline style only**: a position, a size, a transform, the held item above the others,
-  `touch-action: none` on handles, and a placeholder that never takes the pointer. Nothing cosmetic.
+  `touch-action: none` on handles and drag sources, and a placeholder and drag preview that never
+  take the pointer. Nothing cosmetic.
 - **State through `data-*` and ARIA**, present or absent, never `"false"`.
   See [State attributes](/docs/concepts/state-attributes).
 - **No text and no names.** Give every item, handle and button its accessible name.
@@ -29,7 +30,12 @@ Every part follows the same rules.
 | `GridLayout.DragHandle` | `useDragHandle` | the only place its item drags from, and its tab stop |
 | `GridLayout.ResizeHandle` | `useResizeHandle` | a side or corner the item is resized from |
 | `GridLayout.Placeholder` | `usePlaceholder` | where the held item would land, during a gesture |
+| `GridLayout.DragSource` | `useDragSource` | anything on the page that brings a new item in; a tab stop |
+| `GridLayout.DragPreview` | `useDragPreview` | what follows the pointer while it brings an item in |
 
 A part hook returns `{ state, props }`: spread `props` onto any element to make it that part.
+
+Outside the root, parts and hooks reach the grid through a `gridLayoutRef`
+(`useGridLayoutRef()`, or `createGridLayoutRef()` outside a component), given to the root too.
 
 <Example id="unstyled" />

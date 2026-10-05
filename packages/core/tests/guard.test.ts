@@ -27,7 +27,7 @@ function codeOnly(source: string): string {
 // the core never reaches for the browser globals: DOM access goes through an element's
 // ownerDocument/defaultView, so the model loads in Node and the engine runs in any document
 const GLOBAL_DOM =
-    /(?<![.\w$])(document|window|requestAnimationFrame|cancelAnimationFrame|getComputedStyle|navigator|localStorage|sessionStorage|ResizeObserver)\b(?!\s*:)/;
+    /(?<![.\w$])(document|window|requestAnimationFrame|cancelAnimationFrame|getComputedStyle|navigator|localStorage|sessionStorage|ResizeObserver|crypto)\b(?!\s*:)/;
 
 const IMPORT_REACT =
     /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'](?:react|react-dom)(?:\/[^"']*)?["']/;
@@ -97,7 +97,7 @@ describe("core package guard", () => {
         expect(offenders).toEqual([]);
     });
 
-    it("never touches global document, window, observers or frame scheduling", () => {
+    it("never touches global document, window, crypto, observers or frame scheduling", () => {
         const offenders = listFiles(src).flatMap((file) => {
             const match = GLOBAL_DOM.exec(codeOnly(readFileSync(file, "utf8")));
             return match ? [`${file}: ${match[0]}`] : [];
@@ -169,6 +169,8 @@ describe("core package guard", () => {
             found("el.ownerDocument.defaultView.requestAnimationFrame(cb);"),
         ).toBe(false);
         expect(found("view.ResizeObserver")).toBe(false);
+        expect(found("crypto.randomUUID()")).toBe(true);
+        expect(found("host?.crypto?.randomUUID?.()")).toBe(false);
         expect(found('// the window\nif (type === "window") {}')).toBe(false);
         expect(found("function f(window: Window) {}")).toBe(false);
     });

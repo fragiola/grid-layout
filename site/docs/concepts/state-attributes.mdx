@@ -8,8 +8,9 @@ absent, never `"false"`.
 
 ## Parts
 
-Every part carries `data-grid-layout-part`: `root`, `item`, `drag-handle`, `resize-handle` or
-`placeholder`. Items carry `data-item-id`. Tests select by them, never by class names.
+Every part carries `data-grid-layout-part`: `root`, `item`, `drag-handle`, `resize-handle`,
+`placeholder`, `drag-source` or `drag-preview`. Items carry `data-item-id`. Tests select by them,
+never by class names.
 
 ## States
 
@@ -18,11 +19,18 @@ Every part carries `data-grid-layout-part`: `root`, `item`, `drag-handle`, `resi
 | `data-dragging` | root, item, drag handle | a pointer is moving the item |
 | `data-resizing` | root, item, resize handle | a pointer is resizing the item (from this handle) |
 | `data-grabbed` | root, item, drag handle | the keyboard holds the item |
+| `data-dropping` | root | a new item from outside is over the grid |
+| `data-drop-refused` | root, drag preview | an external drag over the grid would not drop |
+| `data-outside` | root, item | the pointer holding an item, or bringing one, is off the grid |
+| `data-dragging` | drag source | a pointer is bringing its item in |
+| `data-grabbed` | drag source | the keyboard is bringing its item in |
+| `data-disabled` | drag source | it starts nothing |
+| `data-over` | drag preview | the pointer is over the grid |
 | `data-static` | item | the item never moves |
 | `data-draggable` | item, drag handle | people may drag the item now |
 | `data-resizable` | item | people may resize the item now |
 | `data-side` | resize handle | its side: `top`, `bottom`, `start`, `end` or a corner |
-| `data-kind` | placeholder | `move`, `resize` or `keyboard` |
+| `data-kind` | placeholder | `move`, `resize`, `keyboard` or `drop` |
 
 ## From state functions
 

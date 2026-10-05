@@ -4,6 +4,8 @@
 
 import type {
     DragHandleState,
+    DragPreviewState,
+    DragSourceState,
     ItemState,
     LayoutItem,
     PlaceholderState,
@@ -12,8 +14,12 @@ import type {
 } from "@fragiola/grid-layout";
 import { Fragment, type ReactNode } from "react";
 import { ItemContext } from "./context";
+import type { GridLayoutRef } from "./gridLayoutRef";
 import {
+    type DragSourceOptions,
     useDragHandle,
+    useDragPreview,
+    useDragSource,
     useGridLayoutView,
     useItem,
     useItems,
@@ -23,6 +29,9 @@ import {
 import { type DivPrimitiveProps, useRenderElement } from "./utils/useRender";
 
 export { Root, type RootProps, type RootState } from "./Root";
+
+/** A primitive's props, without the DOM's own `onDrop` (a drop's callback here). */
+type WithoutDomDrop<P> = Omit<P, "onDrop">;
 
 export interface ItemsProps {
     /** renders one item, keyed by its id */
@@ -120,4 +129,86 @@ export function Placeholder(props: PlaceholderProps) {
         children,
     });
     return placeholder ? element : null;
+}
+
+/** `GridLayout.DragSource`'s props: what it brings, and an element's own. */
+export type DragSourceProps = WithoutDomDrop<
+    DivPrimitiveProps<DragSourceState>
+> &
+    DragSourceOptions & {
+        children?: ReactNode;
+    };
+
+/**
+ * An element anywhere on the page that brings a new item into the grid: pressed and dragged, or
+ * Space/Enter from the keyboard (X1, X6). Outside the root it takes the grid's `gridLayoutRef`.
+ * It is a tab stop, and renders only its children.
+ */
+export function DragSource(props: DragSourceProps) {
+    const {
+        item,
+        itemId,
+        data,
+        dragOffset,
+        disabled,
+        gridLayoutRef,
+        onDrop,
+        children,
+        ...rest
+    } = props;
+    const { state, props: own } = useDragSource({
+        item,
+        itemId,
+        data,
+        dragOffset,
+        disabled,
+        gridLayoutRef,
+        onDrop,
+    });
+    const { ref, onPointerDown, onKeyDown, ...internal } = own;
+    return useRenderElement("div", rest, {
+        state,
+        props: internal,
+        ref,
+        children,
+        // the engine's after the app's own handlers: `preventDefault` vetoes the drop
+        after: { onPointerDown, onKeyDown },
+    });
+}
+
+/** `GridLayout.DragPreview`'s props: its grid, its children, and an element's own. */
+export type DragPreviewProps = DivPrimitiveProps<DragPreviewState> & {
+    /** the grid, for a preview outside its root (inside one, the root around it) */
+    gridLayoutRef?: GridLayoutRef | undefined;
+    /** what it shows: the app's, or a function of its state (the drop's `data`) */
+    children?: ReactNode | ((state: DragPreviewState) => ReactNode);
+};
+
+/**
+ * What follows the pointer while it brings a new item: rendered only then, kept at the pointer by
+ * the engine (`position: fixed`, so no transformed ancestor). Its look is the app's.
+ */
+export function DragPreview(props: DragPreviewProps) {
+    const { gridLayoutRef, ...rest } = props;
+    const preview = useDragPreview(gridLayoutRef);
+    // the app's functions of the state run only while there is one
+    return preview ? <ShownPreview {...rest} preview={preview} /> : null;
+}
+
+function ShownPreview(
+    props: Omit<DragPreviewProps, "gridLayoutRef"> & {
+        preview: NonNullable<ReturnType<typeof useDragPreview>>;
+    },
+) {
+    const { preview, children, ...rest } = props;
+    const { ref, ...internal } = preview.props;
+    return useRenderElement("div", rest, {
+        state: preview.state,
+        props: internal,
+        ref,
+        children:
+            typeof children === "function" ? children(preview.state) : children,
+        // the engine writes its transform
+        drop: ["transform"],
+    });
 }

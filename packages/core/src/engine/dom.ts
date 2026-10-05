@@ -1,7 +1,10 @@
 // The attributes the parts carry and the engine reads: one place, so the adapters and the engine
 // cannot drift.
 
-/** Every part's name: `root`, `item`, `drag-handle`, `resize-handle`, `placeholder`. */
+/**
+ * Every part's name: `root`, `item`, `drag-handle`, `resize-handle`, `placeholder`,
+ * `drag-source`, `drag-preview`.
+ */
 export const PART_ATTRIBUTE = "data-grid-layout-part";
 
 /** An item's id, on its element. */

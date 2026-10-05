@@ -1,7 +1,7 @@
 import type { Layout } from "@fragiola/grid-layout";
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { GridLayout } from "../src";
+import { createGridLayoutRef, GridLayout } from "../src";
 import { cell, GEOMETRY, pointer, stubBrowser } from "./helpers";
 
 // The primitive contract (D4, D5): structural inline style only, state as data-* (present or
@@ -25,9 +25,15 @@ const layout: Layout = [
     { id: "s", x: 2, y: 0, w: 2, h: 1, static: true },
 ];
 
-function Everything() {
+function Everything(props: {
+    gridLayoutRef?: ReturnType<typeof createGridLayoutRef>;
+}) {
     return (
-        <GridLayout.Root {...GEOMETRY} defaultLayout={layout}>
+        <GridLayout.Root
+            {...GEOMETRY}
+            defaultLayout={layout}
+            gridLayoutRef={props.gridLayoutRef}
+        >
             <GridLayout.Items>
                 {(item) => (
                     <GridLayout.Item itemId={item.id}>
@@ -137,6 +143,43 @@ describe("the primitives", () => {
             "translate(10px, 10px)",
         );
         expect((items[0] as HTMLElement).style.color).toBe("blue");
+    });
+
+    it("a drag source and a drag preview set only structural style, and no text, during a drop", () => {
+        stubBrowser();
+        const gridLayoutRef = createGridLayoutRef();
+        const { container } = render(
+            <>
+                <GridLayout.DragSource
+                    gridLayoutRef={gridLayoutRef}
+                    item={{ w: 1, h: 1 }}
+                />
+                <GridLayout.DragPreview gridLayoutRef={gridLayoutRef} />
+                <Everything gridLayoutRef={gridLayoutRef} />
+            </>,
+        );
+        const source = container.querySelector(
+            '[data-grid-layout-part="drag-source"]',
+        ) as Element;
+        const press = pointer(source, 1300, 500);
+        press.move(...cell(6, 0));
+        const all = parts(container);
+        expect(all.map((element) => element.dataset.gridLayoutPart)).toContain(
+            "drag-preview",
+        );
+        for (const element of all) {
+            expect(element.getAttribute("aria-label")).toBeNull();
+            expect(element.getAttribute("role")).toBeNull();
+            for (let i = 0; i < element.style.length; i++) {
+                const property = element.style.item(i);
+                expect(
+                    STRUCTURAL.has(property),
+                    `${element.dataset.gridLayoutPart}: ${property}`,
+                ).toBe(true);
+            }
+        }
+        expect(container.textContent).toBe("");
+        act(() => press.release(...cell(6, 0)));
     });
 
     it("ship no CSS file and set no CSS variable", () => {
