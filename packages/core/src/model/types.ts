@@ -2,6 +2,7 @@
 // middleware chain; reads go through `get` and `is` keys, typed by the registries below.
 
 import type { NewLayoutItem } from "../layout/edit";
+import type { Breakpoints } from "../layout/responsive";
 import type {
     Compactor,
     Layout,
@@ -15,8 +16,12 @@ export const DEFAULT_BREAKPOINT = "default";
 
 /** The model's state: immutable, a new object per committed change. */
 export interface GridLayoutState {
-    /** the columns */
+    /** the active breakpoint's columns */
     readonly cols: number;
+    /** each breakpoint's columns */
+    readonly columns: Readonly<Record<string, number>>;
+    /** each breakpoint's minimum width (one, {@link DEFAULT_BREAKPOINT} at 0, by default) */
+    readonly breakpoints: Breakpoints;
     /**
      * the rows a gesture or a command may ask for (`Infinity`: unbounded); pushes and compaction
      * may still settle items below it
@@ -36,10 +41,20 @@ export interface GridLayoutState {
 
 /** What `createGridLayoutModel` starts from. */
 export interface GridLayoutModelOptions {
-    /** the items (checked, corrected and settled; an invalid layout throws) */
+    /** the starting breakpoint's items (checked, corrected and settled; an invalid layout throws) */
     layout?: Layout | undefined;
-    /** the columns (default 12) */
-    cols?: number | undefined;
+    /**
+     * each breakpoint's items; the starting breakpoint's, when left out, is generated as the
+     * model is made (from the nearest larger one's, else a smaller one's), and any other when it
+     * is first active
+     */
+    layouts?: Readonly<Record<string, Layout>> | undefined;
+    /** each breakpoint's minimum width (default: one breakpoint, {@link DEFAULT_BREAKPOINT}) */
+    breakpoints?: Breakpoints | undefined;
+    /** the starting breakpoint (default: the widest) */
+    breakpoint?: string | undefined;
+    /** the columns, for every breakpoint or each one (default 12) */
+    cols?: number | Readonly<Record<string, number>> | undefined;
     /** the rows a gesture may reach (default: unbounded) */
     maxRows?: number | undefined;
     /** how the layout settles (default: `verticalCompactor`) */
@@ -60,15 +75,26 @@ export type ItemSettings = Partial<
 export type GridSettings = Partial<
     Pick<
         GridLayoutState,
-        "cols" | "maxRows" | "compactor" | "preventCollision" | "allowOverlap"
+        "maxRows" | "compactor" | "preventCollision" | "allowOverlap"
     >
->;
+> & {
+    /** the columns, for every breakpoint or each one */
+    readonly cols?: number | Readonly<Record<string, number>> | undefined;
+    /** each breakpoint's minimum width; the active one must stay */
+    readonly breakpoints?: Breakpoints | undefined;
+};
+
+/** The breakpoint a command edits: the active one unless it names another. */
+export interface AtBreakpoint {
+    /** the breakpoint whose layout it edits (default: the active one) */
+    readonly breakpoint?: string | undefined;
+}
 
 /** Every command: its payload and the value it returns. */
 export interface CommandMap {
     /** replaces the layout (checked, corrected and settled). Returns it */
     "layout.set": {
-        payload: { readonly layout: Layout };
+        payload: { readonly layout: Layout } & AtBreakpoint;
         result: { readonly layout: Layout };
     };
     /**
@@ -76,12 +102,12 @@ export interface CommandMap {
      * none (its id unused). Returns it, as placed, and the layout, settled
      */
     "item.add": {
-        payload: { readonly item: NewLayoutItem };
+        payload: { readonly item: NewLayoutItem } & AtBreakpoint;
         result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** removes an item. Returns its id */
     "item.remove": {
-        payload: { readonly itemId: string };
+        payload: { readonly itemId: string } & AtBreakpoint;
         result: { readonly itemId: string };
     };
     /**
@@ -93,7 +119,7 @@ export interface CommandMap {
             readonly itemId: string;
             readonly x: number;
             readonly y: number;
-        };
+        } & AtBreakpoint;
         result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /**
@@ -106,7 +132,7 @@ export interface CommandMap {
             readonly w: number;
             readonly h: number;
             readonly side?: ResizeSide | undefined;
-        };
+        } & AtBreakpoint;
         result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /**
@@ -120,18 +146,49 @@ export interface CommandMap {
             readonly y: number;
             readonly w: number;
             readonly h: number;
-        };
+        } & AtBreakpoint;
         result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** changes an item's limits and flags; its size comes back within the new limits */
     "item.configure": {
-        payload: { readonly itemId: string; readonly settings: ItemSettings };
+        payload: {
+            readonly itemId: string;
+            readonly settings: ItemSettings;
+        } & AtBreakpoint;
         result: { readonly item: LayoutItem; readonly layout: Layout };
     };
     /** changes the grid's rules; every layout is corrected and settled under them */
     "grid.configure": {
         payload: { readonly settings: GridSettings };
         result: { readonly rules: LayoutRules };
+    };
+    /**
+     * makes a breakpoint the active one, its columns the grid's. A breakpoint without a layout,
+     * or whose items differ from the one before, is brought up to date right after
+     * (`layouts.generate`)
+     */
+    "breakpoint.set": {
+        payload: { readonly breakpoint: string };
+        result: { readonly breakpoint: string; readonly cols: number };
+    };
+    /**
+     * replaces every breakpoint's layout (each checked, corrected and settled in its columns);
+     * the active one, when left out, is generated right after
+     */
+    "layouts.set": {
+        payload: { readonly layouts: Readonly<Record<string, Layout>> };
+        result: { readonly layouts: Readonly<Record<string, Layout>> };
+    };
+    /**
+     * a breakpoint's layout made (from the nearest larger breakpoint's, else `from`'s) or brought
+     * up to date with `from`'s items: what the model runs itself after a breakpoint change
+     */
+    "layouts.generate": {
+        payload: {
+            readonly breakpoint: string;
+            readonly from?: string | undefined;
+        };
+        result: { readonly layout: Layout };
     };
 }
 
@@ -240,6 +297,25 @@ export interface QueryMap {
     breakpoint: { payload: undefined; result: string };
     /** every breakpoint's layout */
     layouts: { payload: undefined; result: Readonly<Record<string, Layout>> };
+    /** a breakpoint's layout, if it has one yet */
+    "layout-by": {
+        payload: { readonly breakpoint: string };
+        result: Layout | undefined;
+    };
+    /** the active breakpoint's columns */
+    cols: { payload: undefined; result: number };
+    /** a breakpoint's columns */
+    "cols-by": {
+        payload: { readonly breakpoint: string };
+        result: number | undefined;
+    };
+    /** each breakpoint's minimum width */
+    breakpoints: { payload: undefined; result: Breakpoints };
+    /** the breakpoint for a width: the widest whose minimum is at most it */
+    "breakpoint-for": {
+        payload: { readonly width: number };
+        result: string;
+    };
 }
 
 export type QueryKey = keyof QueryMap;

@@ -18,6 +18,7 @@ const s: LayoutItem = { id: "s", x: 2, y: 0, w: 1, h: 1, static: true };
 function view(over: Partial<GridLayoutView> = {}): GridLayoutView {
     return {
         width: 400,
+        breakpoint: "default",
         height: 120,
         dir: "ltr",
         geometry: {

@@ -20,6 +20,7 @@ import {
 } from "../layout/geometry";
 import { fitSize } from "../layout/limits";
 import { resizeRect, sideEdges } from "../layout/resize";
+import { valueAt } from "../layout/responsive";
 import type { GridRect, Layout, LayoutItem, ResizeSide } from "../layout/types";
 import { rulesOf } from "../model/model";
 import type { GridLayoutModel } from "../model/types";
@@ -39,14 +40,16 @@ import type {
     GridLayoutEngine,
     GridLayoutEngineOptions,
     GridLayoutView,
+    PerBreakpoint,
 } from "./types";
 
 /** The options with their defaults. */
 interface Settings {
     readonly width: number | undefined;
-    readonly rowHeight: number;
-    readonly gap: readonly [number, number];
-    readonly padding: readonly [number, number];
+    readonly rowHeight: PerBreakpoint<number>;
+    readonly gap: PerBreakpoint<readonly [number, number]>;
+    readonly padding: PerBreakpoint<readonly [number, number]> | undefined;
+    readonly breakpoint: string | undefined;
     readonly autoSize: boolean;
     readonly draggable: boolean;
     readonly resizable: boolean;
@@ -58,12 +61,12 @@ interface Settings {
 }
 
 function settingsOf(options: GridLayoutEngineOptions): Settings {
-    const gap = options.gap ?? [10, 10];
     return {
         width: options.width,
-        rowHeight: options.rowHeight ?? 150,
-        gap,
-        padding: options.padding ?? gap,
+        rowHeight: options.rowHeight ?? DEFAULT_ROW_HEIGHT,
+        gap: options.gap ?? DEFAULT_GAP,
+        padding: options.padding,
+        breakpoint: options.breakpoint,
         autoSize: options.autoSize ?? true,
         draggable: options.draggable ?? true,
         resizable: options.resizable ?? true,
@@ -142,6 +145,22 @@ interface Preview {
     readonly landed: LayoutItem;
     readonly refused: boolean;
 }
+
+/**
+ * How far past a threshold the width must go to cross back the one it just crossed: a scrollbar
+ * that a breakpoint's taller layout brings (or takes away) never flips it back (no resize loop).
+ */
+const SETTLE = 24;
+
+/** The gap and the row height a grid takes by default. */
+const DEFAULT_GAP: readonly [number, number] = [10, 10];
+const DEFAULT_ROW_HEIGHT = 150;
+
+/** A pair (`[inline, block]`), not a map of them. */
+const isPair = (value: unknown) => Array.isArray(value);
+
+/** A number, not a map of them. */
+const isNumber = (value: unknown) => typeof value === "number";
 
 const ARROWS: Record<string, readonly [number, number]> = {
     ArrowLeft: [-1, 0],
@@ -229,13 +248,19 @@ export function createGridLayoutEngine(
         if (committing) return;
         // an item a keyboard drop added, not mounted before the app's next command: not focused
         focusNext = undefined;
-        // the layout changed under a gesture (the app ran a command): it ends, unapplied; a rule
-        // that changed nothing in the layout leaves it going
-        if (session && event.before.layouts !== event.after.layouts) {
+        // the layout (or the breakpoint) changed under a gesture (the app ran a command): it
+        // ends, unapplied; a rule that changed nothing in the layout leaves it going
+        if (
+            session &&
+            (event.before.layouts !== event.after.layouts ||
+                event.before.breakpoint !== event.after.breakpoint)
+        ) {
             cancel(undefined);
         } else {
             update();
         }
+        // new thresholds: the width decides the breakpoint again
+        if (event.before.breakpoints !== event.after.breakpoints) reresolve();
     });
 
     // ─── the view ───────────────────────────────────────────────────────────────────────────
@@ -243,13 +268,77 @@ export function createGridLayoutEngine(
     function geometryOf(): GridGeometry | undefined {
         const width = settings.width ?? measured;
         if (width <= 0) return undefined;
+        // each value the active breakpoint's, when it is given per breakpoint (R4)
+        const { breakpoint } = model.state;
+        const gap = valueAt(settings.gap, breakpoint, isPair, [
+            10, 10,
+        ] as const);
         return {
             width,
             cols: model.state.cols,
-            rowHeight: settings.rowHeight,
-            gap: settings.gap,
-            padding: settings.padding,
+            rowHeight: valueAt(
+                settings.rowHeight,
+                breakpoint,
+                isNumber,
+                DEFAULT_ROW_HEIGHT,
+            ),
+            gap,
+            padding: valueAt(settings.padding, breakpoint, isPair, gap),
         };
+    }
+
+    // ─── the breakpoint ─────────────────────────────────────────────────────────────────────
+
+    /** the breakpoint the width gave last, and the threshold the measured width crossed to it */
+    let resolved: string | undefined;
+    let crossed: { from: string; threshold: number } | undefined;
+
+    /** The breakpoint the width gives, when it gives a new one (R1). */
+    function fromWidth(): string | undefined {
+        const width = settings.width ?? measured;
+        if (width <= 0) return undefined;
+        const next = model.get("breakpoint-for", { width });
+        // the width's breakpoint did not change: one the app chose meanwhile stands
+        if (next === resolved) return undefined;
+        // a measured width crossing straight back the threshold it just crossed, by less than
+        // SETTLE, is a scrollbar the switch brought or took: it stays (a given width never waits)
+        if (crossed && Math.abs(width - crossed.threshold) >= SETTLE)
+            crossed = undefined;
+        if (crossed && next === crossed.from && settings.width === undefined) {
+            return undefined;
+        }
+        if (resolved !== undefined && settings.width === undefined) {
+            const { breakpoints } = model.state;
+            crossed = {
+                from: resolved,
+                threshold: Math.max(
+                    breakpoints[resolved] ?? 0,
+                    breakpoints[next] ?? 0,
+                ),
+            };
+        }
+        resolved = next;
+        return next;
+    }
+
+    /** Forgets what the width gave, so the width decides again (its breakpoints changed). */
+    function reresolve(): void {
+        resolved = undefined;
+        crossed = undefined;
+        resolveBreakpoint();
+    }
+
+    /** Makes the controlled breakpoint, else a new one the width gives, the model's active one. */
+    function resolveBreakpoint(): void {
+        const wanted = settings.breakpoint ?? fromWidth();
+        if (
+            wanted === undefined ||
+            wanted === model.state.breakpoint ||
+            !Object.hasOwn(model.state.breakpoints, wanted)
+        ) {
+            return;
+        }
+        model.run("breakpoint.set", { breakpoint: wanted });
     }
 
     /** The gesture holds an item the engine draws at the pointer itself. */
@@ -272,6 +361,7 @@ export function createGridLayoutEngine(
         return {
             items: itemsOf(layout),
             width: geometry?.width ?? 0,
+            breakpoint: model.state.breakpoint,
             height:
                 geometry && settings.autoSize
                     ? containerHeight(geometry, bottom(shown))
@@ -307,6 +397,7 @@ export function createGridLayoutEngine(
     function sameView(a: GridLayoutView, b: GridLayoutView): boolean {
         return (
             a.width === b.width &&
+            a.breakpoint === b.breakpoint &&
             a.height === b.height &&
             a.dir === b.dir &&
             a.layout === b.layout &&
@@ -333,6 +424,8 @@ export function createGridLayoutEngine(
     }
 
     view = computeView();
+    // a given width or a controlled breakpoint applies from the start (server rendering)
+    resolveBreakpoint();
 
     // ─── pixels and direction ───────────────────────────────────────────────────────────────
 
@@ -1516,6 +1609,7 @@ export function createGridLayoutEngine(
                 root = element;
                 measured = Math.round(element.clientWidth);
                 readDirection();
+                resolveBreakpoint();
                 update();
                 const host = element.ownerDocument.defaultView;
                 const Observer = host?.ResizeObserver;
@@ -1529,6 +1623,7 @@ export function createGridLayoutEngine(
                               if (root !== element) return;
                               measured = Math.round(element.clientWidth);
                               readDirection();
+                              resolveBreakpoint();
                               update();
                           });
                       })
@@ -1592,6 +1687,18 @@ export function createGridLayoutEngine(
                 const before = settings;
                 settings = settingsOf(next);
                 if (settings.dir !== before.dir) readDirection();
+                // released, the width decides again; a new one (or a new width) applies
+                if (
+                    before.breakpoint !== undefined &&
+                    settings.breakpoint === undefined
+                ) {
+                    reresolve();
+                } else if (
+                    settings.breakpoint !== before.breakpoint ||
+                    settings.width !== before.width
+                ) {
+                    resolveBreakpoint();
+                }
                 update();
             },
             startExternalDrag,
