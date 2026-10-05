@@ -3,29 +3,30 @@ title: Limitations and roadmap
 description: What is not built yet, what the examples do meanwhile, and the order the next steps will come in.
 ---
 
-The layout rules, the model, the engine, the React primitives, the keyboard, right-to-left and
-drops from outside the grid are in. Much of a full grid layout is still to come.
+The layout rules, the model, the engine, the React primitives, the keyboard, right-to-left, drops
+from outside the grid, responsive grids and touch are in. Much of a full grid layout is still to
+come.
 
 ## The gaps
 
 | missing | what the examples do meanwhile |
 | --- | --- |
-| On touch, an item's **body** does not drag: the page scrolls. | A drag handle or a resize handle takes touch at once. Long-press on bodies comes with responsive and mobile grids. |
 | No dragging an item **between two grids**. | Drag it out of one (`onDragStop` with `outside`) and bring it into the other from a drag source ([`toolbox`](/examples/toolbox)). |
 | No native drag **out** of the grid into another app. | Export the item another way (a button, the clipboard). |
-| On touch, a **drag source** takes the press at once: a sidebar of sources does not scroll from them. | Leave room to scroll between the sources. Long-press comes with responsive and mobile grids. |
+| On touch, a **drag source** takes the press at once: a sidebar of sources does not scroll from them. | Leave room to scroll between the sources (the [`widget-sheet`](/examples/widget-sheet) scrolls from its edges). |
+| No hiding an item on one **breakpoint** only: every breakpoint shows the same items. | Remove it on that breakpoint, and add it back when another is active. |
+| No **viewport** breakpoints: the grid's own width decides. | Pass `breakpoint` (controlled) from your own media query. |
+| No **pinch-zoom** of the grid. | Let the page zoom. |
+| Touch is checked in Chromium's real touch input and in WebKit on an iPhone's viewport (synthetic touch), not on a real iPhone. | Check your app on a device; the [guide](/docs/guides/mobile-and-touch) lists what iOS needs from your CSS. |
 | Native drags from the operating system are checked with synthetic events in the end-to-end tests (Chromium and Firefox), not with real files. React Grid Layout's Firefox workaround (a class name on the dragged-over element) is not used: the grid counts the drag's enter and leave events and reads where a leave goes. | Report a browser where a file drag over items behaves differently. |
-| No **breakpoints**: one layout, whatever the width. | Fewer `cols` on a narrow screen, chosen by the app. |
 | No **constraints** beyond an item's own limits (aspect ratios, snapping), no wrap or fast compactor. | `minW`, `maxW`, `minH`, `maxH`, and middleware on `item.resize`. |
 | With `allowOverlap`, no **bring to front**: the layout's order is the drawing order. | Reorder the layout. |
-| No auto-scroll near the edges of a scrolling page during a drag. | Keep long dashboards in view, or drag in steps. |
 
 ## The roadmap
 
-1. **Responsive and mobile**: breakpoints by container width, layouts per breakpoint, long-press
-   touch, edge auto-scroll.
-2. **Constraints, compactors and positioning**: pluggable constraints, aspect ratios, wrap and
+1. **Constraints, compactors and positioning**: pluggable constraints, aspect ratios, wrap and
    fast compactors, scaled containers, a grid background.
-3. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
+2. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
    Layout.
-4. **Between grids**: an item dragged from one grid into another.
+3. **Between grids**: an item dragged from one grid into another.
+4. **Per-breakpoint visibility**: an item shown on some breakpoints only.

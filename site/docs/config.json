@@ -59,6 +59,10 @@
                     "path": "concepts/external-drop"
                 },
                 {
+                    "label": "Responsive grids",
+                    "path": "concepts/responsive"
+                },
+                {
                     "label": "Keyboard and accessibility",
                     "path": "concepts/keyboard-and-accessibility"
                 },
@@ -96,6 +100,10 @@
                 {
                     "label": "A widget sidebar",
                     "path": "guides/widget-sidebar"
+                },
+                {
+                    "label": "Mobile and touch",
+                    "path": "guides/mobile-and-touch"
                 }
             ]
         },

@@ -1,0 +1,82 @@
+---
+title: Mobile and touch
+description: Long press to move items on a phone while the page still scrolls, handles and sources that start at once, and edge auto-scroll.
+---
+
+On a phone, a finger on an item does two things: it scrolls the page, and it moves the item. The
+grid tells them apart by time.
+
+## A long press on an item's body
+
+A touch on an item's body is **held** before it drags: `touchDelay`, 250 milliseconds by default.
+
+- **Held within `touchTolerance`** (5 pixels): the item lifts, the drag starts, and the page stops
+  scrolling under the finger.
+- **Moved sooner:** a swipe. The grid lets it go and the page scrolls as always.
+
+While the touch is held, the item carries `data-pressing`. The cue is yours: a ring, a slight
+shrink, a haptic tick.
+
+```tsx title="card.tsx"
+<GridLayout.Root touchDelay={300} touchTolerance={8}>
+    <GridLayout.Items>
+        {(item) => (
+            <GridLayout.Item
+                itemId={item.id}
+                className="card data-pressing:scale-95 data-pressing:ring-2"
+            />
+        )}
+    </GridLayout.Items>
+</GridLayout.Root>
+```
+
+A mouse and a pen never wait.
+
+<Example id="mobile-dashboard" />
+
+## What starts at once
+
+A **drag handle**, a **resize handle** and a **drag source** start as soon as the finger moves
+past the threshold. Their `touch-action: none` makes their touches drags, never scrolls. An item
+with a drag handle drags only from it, at once; its body scrolls the page.
+
+Give handles a hit area a finger can find: about 44 pixels. Their size and place are yours, set
+in your CSS.
+
+<Example id="widget-sheet" />
+
+## iOS
+
+On iOS a long press on text or a link opens a callout or starts a selection. The grid prevents
+selection while an item is held, but the callout is a style, and styles are yours. Set it on the
+items you let people hold:
+
+```css title="items.css"
+[data-grid-layout-part="item"] {
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+```
+
+The grid's touch specs run in WebKit on an iPhone's viewport in continuous integration, as a
+report; the examples run on a Chromium phone. Check a real iPhone before you ship.
+
+<Example id="home-screen" />
+
+## Edge auto-scroll
+
+During a move, a resize or a drop from a drag source, a pointer near the edge of the scroll
+container scrolls it. The scroll container is the nearest scrollable ancestor along each axis,
+else the page.
+
+- **Where:** within `autoScroll.threshold` of the edge (40 pixels, at most half the view).
+- **How fast:** up to `autoScroll.speed` a frame (20 pixels), faster the closer to the edge.
+- **What follows:** the preview, as the content moves under the pointer.
+- **When it stops:** out of the zone, at the grid's end, and with the gesture.
+
+```tsx title="scroll.tsx"
+<GridLayout.Root autoScroll={{ threshold: 48, speed: 24 }} />
+<GridLayout.Root autoScroll={false} />
+```
+
+<Example id="long-dashboard" />
