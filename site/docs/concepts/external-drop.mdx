@@ -37,7 +37,8 @@ const gridLayoutRef = useGridLayoutRef();
 ```
 
 A source gives the new item's size and limits (`item`), never its cell. It can name the new item's
-id (`itemId`). Otherwise the root's `createId` makes one, and without that a random UUID is used.
+id (`itemId`). Otherwise the root's `createId` makes one when the drop begins, and without that a
+random UUID is used.
 It can carry `data`, which is yours: it comes back in the gesture's events and in `onDrop`, on
 the root and on the source.
 

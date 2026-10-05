@@ -26,6 +26,8 @@ export const icon = "size-4 shrink-0";
 
 export const status = "text-palette-accent/85";
 
+export const last = "text-xs tabular-nums";
+
 /** room below the items to drop into: the root is as tall as its layout otherwise */
 export const root = (state: RootState) =>
     cn(

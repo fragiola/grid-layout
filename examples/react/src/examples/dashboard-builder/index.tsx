@@ -20,6 +20,7 @@ import {
     isKind,
     kindOfId,
 } from "../_kit/catalogue";
+import { pointerOver } from "../_kit/hit";
 import { forget, load, save } from "../_kit/storage";
 import * as styles from "./styles";
 import { WidgetBody } from "./widget-body";
@@ -198,17 +199,10 @@ function useHeldOver(
 ): boolean {
     const [over, setOver] = useState(false);
     useGridLayoutEvents((event) => {
-        const at = event.nativeEvent;
-        const box = target.current?.getBoundingClientRect();
         setOver(
             event.type === "drag" &&
                 event.outside &&
-                box !== undefined &&
-                at instanceof MouseEvent &&
-                at.clientX >= box.left &&
-                at.clientX <= box.right &&
-                at.clientY >= box.top &&
-                at.clientY <= box.bottom,
+                pointerOver(target.current, event.nativeEvent),
         );
     }, gridLayoutRef);
     return over;

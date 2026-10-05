@@ -123,11 +123,13 @@ an implementation detail.
     the files can be read (that answer can refuse and gives the data; the size stays the shown
     one). The drag image is the app's: `GridLayout.DragPreview`, kept at the pointer by the engine.
 16. **Preview, then commit (X2).** A drop is a gesture of kind `drop`. Its preview is the model's
-    dry run of `item.add` against the layout at the gesture's start, under a stand-in id no item
-    uses (or the source's `itemId`); it never enters the model nor `onLayoutChange`. The item is
+    dry run of `item.add` against the layout at the gesture's start, under the id the drop
+    commits (made when the drop begins); it never enters the model nor `onLayoutChange`. The item is
     centred under the pointer, moved by `dragOffset`, bounded with `bounded`, mirrored in RTL.
     The drop runs **one** `item.add`, its id the source's `itemId`, else the engine's `createId`
-    option's, else `crypto.randomUUID()` through the root's `defaultView` (D13). Then `onDrop({
+    option's (Root's `createId`), else `crypto.randomUUID()` through the root's `defaultView`
+    (D13). `createId` is the engine's, not the model's: the engine is what makes a drop's id, and
+    an app's own `item.add` names its id (D14). Then `onDrop({
     item, data, layout })`, on the root and on the source.
 17. **Dragging out is reported, never removed (X3).** Once a held item's centre leaves the root
     (past its sides or top, or further below its bottom than its own height with `autoSize`),

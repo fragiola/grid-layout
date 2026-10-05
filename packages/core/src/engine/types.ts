@@ -11,7 +11,7 @@ export type DropItem = Pick<LayoutItem, "w" | "h"> &
 /** A drop from outside the grid: the item it adds, its id, and the app's own data. */
 export interface ExternalDrop {
     readonly item: DropItem;
-    /** the new item's id (default: the `createId` option's, else a random UUID) */
+    /** the new item's id (default: the `createId` option's, else a random UUID, made when the drop begins) */
     readonly itemId?: string | undefined;
     /** the app's own data: opaque, told back in the gesture's events and the drop */
     readonly data?: unknown;
@@ -59,8 +59,8 @@ export interface GridLayoutEngineOptions {
      */
     onExternalDrag?: ((event: DragEvent) => ExternalDragAnswer) | undefined;
     /**
-     * a new id for an item dropped from outside without one (default: a random UUID from the
-     * root's window)
+     * a new id for an item dropped from outside without one, made when its drop begins (default:
+     * a random UUID from the root's window)
      */
     createId?: (() => string) | undefined;
 }
@@ -82,7 +82,7 @@ export interface GestureView {
      */
     readonly kind: "move" | "resize" | "keyboard" | "drop";
     readonly source: GestureSource;
-    /** the held item; a drop's is the source's `itemId`, or a stand-in until it lands */
+    /** the held item; a drop's is the id it lands with (the source's `itemId`, or a new one) */
     readonly itemId: string;
     /** the side a pointer resize pulls */
     readonly side: ResizeSide | undefined;
@@ -159,7 +159,7 @@ export interface GestureEvent {
         | "drop-over"
         | "drop-cancel";
     readonly source: GestureSource;
-    /** the held item; a drop's is its new id once it lands */
+    /** the held item; a drop's is the id it lands with */
     readonly itemId: string;
     /** the layout now: the preview during a gesture, the committed one when it ends */
     readonly layout: Layout;

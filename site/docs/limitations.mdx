@@ -14,7 +14,7 @@ drops from outside the grid are in. Much of a full grid layout is still to come.
 | No dragging an item **between two grids**. | Drag it out of one (`onDragStop` with `outside`) and bring it into the other from a drag source ([`toolbox`](/examples/toolbox)). |
 | No native drag **out** of the grid into another app. | Export the item another way (a button, the clipboard). |
 | On touch, a **drag source** takes the press at once: a sidebar of sources does not scroll from them. | Leave room to scroll between the sources. Long-press comes with responsive and mobile grids. |
-| Native drags from the operating system are checked with synthetic events in the end-to-end tests, not real files. | Nothing to do: Chromium and Firefox behave the same on the events the grid reads. |
+| Native drags from the operating system are checked with synthetic events in the end-to-end tests (Chromium and Firefox), not with real files. React Grid Layout's Firefox workaround (a class name on the dragged-over element) is not used: the grid counts the drag's enter and leave events and reads where a leave goes. | Report a browser where a file drag over items behaves differently. |
 | No **breakpoints**: one layout, whatever the width. | Fewer `cols` on a narrow screen, chosen by the app. |
 | No **constraints** beyond an item's own limits (aspect ratios, snapping), no wrap or fast compactor. | `minW`, `maxW`, `minH`, `maxH`, and middleware on `item.resize`. |
 | With `allowOverlap`, no **bring to front**: the layout's order is the drawing order. | Reorder the layout. |

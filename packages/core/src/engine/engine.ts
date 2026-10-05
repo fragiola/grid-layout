@@ -75,9 +75,6 @@ function settingsOf(options: GridLayoutEngineOptions): Settings {
     };
 }
 
-/** The id a drop's preview holds when its source names none: the real one is made at the drop. */
-const DROP_ID = "grid-layout-drop";
-
 /** A drop item's own fields: its size and limits, nothing else the app's object carries. */
 function dropItemOf(item: DropItem): DropItem {
     const own: { -readonly [K in keyof DropItem]: DropItem[K] } = {
@@ -230,6 +227,8 @@ export function createGridLayoutEngine(
     const gestureListeners = new Set<GestureListener>();
     const unsubscribeModel = model.subscribe((event) => {
         if (committing) return;
+        // an item a keyboard drop added, not mounted before the app's next command: not focused
+        focusNext = undefined;
         // the layout changed under a gesture (the app ran a command): it ends, unapplied; a rule
         // that changed nothing in the layout leaves it going
         if (session && event.before.layouts !== event.after.layouts) {
@@ -426,12 +425,8 @@ export function createGridLayoutEngine(
     // ─── previews ───────────────────────────────────────────────────────────────────────────
 
     /** The command a gesture ending at `target` runs, or none when it changes nothing. */
-    function commandFor(
-        current: Session,
-        target: GridRect,
-        itemId = current.itemId,
-    ) {
-        const { before } = current;
+    function commandFor(current: Session, target: GridRect) {
+        const { before, itemId } = current;
         if (current.drop) {
             return {
                 command: "item.add",
@@ -678,11 +673,7 @@ export function createGridLayoutEngine(
     function land(current: Session, nativeEvent: Event | undefined): void {
         let result: ReturnType<typeof model.run<"item.add">> | undefined;
         if (!current.outside && !current.refused) {
-            const call = commandFor(
-                current,
-                current.target,
-                current.drop?.itemId ?? newId(),
-            );
+            const call = commandFor(current, current.target);
             committing = true;
             try {
                 result = model.run(
@@ -1096,19 +1087,18 @@ export function createGridLayoutEngine(
     // ─── drops from outside ─────────────────────────────────────────────────────────────────
 
     /**
-     * The item `drop` adds at `cell`, its size within its limits and the columns. Without an id
-     * of its own, it holds a stand-in no item uses until it lands.
+     * The item `drop` adds at `cell`, its size within its limits and the columns. Its id is the
+     * one the drop commits, made when the drop begins: the preview and the drop are the same
+     * `item.add`, for any middleware that reads the id.
      */
     function dropped(
         drop: ExternalDrop,
         cell: { readonly x: number; readonly y: number },
     ): LayoutItem {
-        let itemId = drop.itemId ?? DROP_ID;
-        while (!drop.itemId && model.get("item-by", { itemId })) itemId += "-";
         const item = dropItemOf(drop.item);
         return {
             ...item,
-            id: itemId,
+            id: drop.itemId ?? newId(),
             x: cell.x,
             y: cell.y,
             ...fitSize(item, model.state.cols),
@@ -1218,8 +1208,9 @@ export function createGridLayoutEngine(
 
     /** A native drag entering the root: the app's answer, then a drop session when it accepts. */
     function enterNative(event: DragEvent): void {
-        if (session) return;
-        const answer = settings.onExternalDrag?.(event);
+        // during another gesture (an item grabbed from the keyboard) a native drag is refused:
+        // let pass, the browser would open a dropped file in place of the page
+        const answer = session ? false : settings.onExternalDrag?.(event);
         native = { depth: 1, answer };
         if (answer) beginNative(event, answer);
         update();
@@ -1268,8 +1259,15 @@ export function createGridLayoutEngine(
     }
 
     function dragleave(event: DragEvent): void {
-        if (!native || !own(event)) return;
-        native.depth--;
+        if (!native || !own(event) || !root) return;
+        // where it goes, when the browser says: still inside, or out (whatever the count, which
+        // an element removed mid-drag leaves high: its own leave never comes)
+        const to = event.relatedTarget as Node | null;
+        native.depth = to
+            ? root.contains(to)
+                ? Math.max(native.depth - 1, 1)
+                : 0
+            : native.depth - 1;
         if (native.depth > 0) return;
         native = undefined;
         if (session?.source === "native") cancel(event);

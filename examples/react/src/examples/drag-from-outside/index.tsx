@@ -25,6 +25,7 @@ export default function DragFromOutside() {
     const [message, setMessage] = useState(
         "Drag the note into the grid, or Tab to it and press Enter.",
     );
+    const [last, setLast] = useState("");
     return (
         <div className={styles.frame}>
             <aside className={styles.sidebar} aria-label="New items">
@@ -42,6 +43,7 @@ export default function DragFromOutside() {
                 <p role="status" className={styles.status}>
                     {message}
                 </p>
+                {last && <p className={styles.last}>{last}</p>}
                 <Announcer
                     gridLayoutRef={gridLayoutRef}
                     onMessage={setMessage}
@@ -56,6 +58,12 @@ export default function DragFromOutside() {
                     made.current += 1;
                     return `note-${made.current}`;
                 }}
+                // the drop, told once it is in the layout: here, the cell it took
+                onDrop={({ item }) =>
+                    setLast(
+                        `Last drop: column ${item.x + 1}, row ${item.y + 1}`,
+                    )
+                }
                 aria-label="Dashboard"
                 className={styles.root}
             >

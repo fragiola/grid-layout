@@ -293,12 +293,15 @@ export function useDragSource(
     const element = useRef<HTMLElement | null>(null);
     const engine = grid?.engine;
     const disabled = options.disabled === true;
-    // only this source's part of the view: a gesture elsewhere renders nothing here
-    const partNow = () =>
-        dragSourcePart(engine?.adapter.getView(), element.current, disabled);
+    // only this source's part of the view: a gesture elsewhere renders nothing here (and the
+    // check allocates nothing, on every view change of every source)
     const statusNow = () => {
-        const { dragging, grabbed } = partNow().state;
-        return dragging ? "dragging" : grabbed ? "grabbed" : "";
+        const gesture = engine?.adapter.getView().gesture;
+        return gesture?.kind === "drop" &&
+            element.current !== null &&
+            gesture.origin === element.current
+            ? gesture.source
+            : "";
     };
     useSyncExternalStore(
         engine ? engine.adapter.subscribe : noSubscription,
@@ -336,7 +339,11 @@ export function useDragSource(
         const { item, itemId, data, dragOffset } = latest.current;
         return { item, itemId, data, dragOffset };
     };
-    const part = partNow();
+    const part = dragSourcePart(
+        engine?.adapter.getView(),
+        element.current,
+        disabled,
+    );
     return {
         state: part.state,
         props: {

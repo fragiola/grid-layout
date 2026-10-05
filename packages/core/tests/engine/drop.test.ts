@@ -354,15 +354,36 @@ describe("the model decides a drop", () => {
         expect(grid.model.get("layout")).toHaveLength(2);
     });
 
-    it("gives the preview a stand-in id no item uses", () => {
+    it("previews under the id it commits, for a rule that reads ids", () => {
+        let next = 0;
         const grid = setup({
-            layout: [item("grid-layout-drop", 0, 0, 2, 1)],
+            ...two(),
+            engine: { createId: () => `w-${++next}` },
         });
+        // a rule on ids: the preview's verdict is the drop's
+        grid.model.use((ctx, next) =>
+            ctx.command === "item.add" && !ctx.payload.item.id.startsWith("w-")
+                ? veto()
+                : next(),
+        );
         const source = grid.source({ item: { w: 1, h: 1 } });
         const press = pointer(source, 1300, 20);
         press.move(...centre(grid, 5, 0, 1, 1));
+        expect(grid.view().gesture?.itemId).toBe("w-1");
         expect(grid.view().dropRefused).toBe(false);
-        expect(grid.view().gesture?.preview).toHaveLength(2);
+        press.release(...centre(grid, 5, 0, 1, 1));
+        expect(grid.events.at(-1)).toMatchObject({
+            type: "drop",
+            itemId: "w-1",
+        });
+    });
+
+    it("shows refused a new id the layout already holds, as the drop would be", () => {
+        const grid = setup({ ...two(), engine: { createId: () => "a" } });
+        const source = grid.source({ item: { w: 1, h: 1 } });
+        const press = pointer(source, 1300, 20);
+        press.move(...centre(grid, 5, 0, 1, 1));
+        expect(grid.view().dropRefused).toBe(true);
         press.release(...centre(grid, 5, 0, 1, 1));
         expect(grid.model.get("layout")).toHaveLength(2);
     });
@@ -427,6 +448,18 @@ describe("a drop from a drag source, by keyboard", () => {
         // the new item takes the focus once it is on the page
         const element = grid.mount(dropped?.itemId ?? "");
         expect(document.activeElement).toBe(element);
+    });
+
+    it("forgets the focus it owes once the app runs another command", () => {
+        const grid = setup(two());
+        const source = grid.source({ item: { w: 1, h: 1 }, itemId: "late" });
+        source.focus();
+        key(source, "Enter");
+        key(source, "Enter");
+        grid.model.run("item.remove", { itemId: "late" });
+        grid.model.run("item.add", { item: item("late", 8, 0, 1, 1) });
+        const element = grid.mount("late");
+        expect(document.activeElement).not.toBe(element);
     });
 
     it("gives up on Escape, Tab and the focus leaving, the layout untouched", () => {
@@ -632,6 +665,31 @@ describe("a native drag from another window", () => {
         const added = grid.events.at(-1);
         expect(added?.data).toBe("file");
         expect(added?.item).not.toHaveProperty("data");
+    });
+
+    it("ends a drag the browser says left the root, whatever the count", () => {
+        const { grid } = native(() => ({ w: 1, h: 1 }));
+        nativeDrag(grid.root, "dragenter", ...centre(grid, 5, 0, 1, 1));
+        // an item entered, then removed mid-drag: its own leave never comes
+        nativeDrag(grid.item("a"), "dragenter", 20, 20);
+        const away = new MouseEvent("dragleave", {
+            bubbles: true,
+            relatedTarget: document.body,
+        });
+        grid.root.dispatchEvent(away);
+        expect(grid.view().gesture).toBeUndefined();
+        expect(grid.events.at(-1)?.type).toBe("drop-cancel");
+    });
+
+    it("refuses a native drag while the keyboard holds an item", () => {
+        const { grid, onExternalDrag } = native(() => ({ w: 1, h: 1 }));
+        grid.item("a").focus();
+        key(grid.item("a"), " ");
+        const enter = nativeDrag(grid.root, "dragenter", 300, 20);
+        expect(enter.defaultPrevented).toBe(true);
+        expect(enter.dataTransfer.dropEffect).toBe("none");
+        expect(onExternalDrag).not.toHaveBeenCalled();
+        expect(grid.view().gesture?.kind).toBe("keyboard");
     });
 
     it("starts again over a layout the app changed under the drag", () => {
