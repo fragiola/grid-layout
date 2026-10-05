@@ -491,7 +491,14 @@ export function createGridLayoutEngine(
         const call = commandFor(current, target);
         if (!call) return still(current);
         const result = model.check(call.command, call.payload as never);
-        if (!result.ok) return { ...still(current), refused: true };
+        if (!result.ok) {
+            // a refused drop is where it is, shown refused; a refused move goes back
+            const landed =
+                current.kind === "drop"
+                    ? { ...current.before, ...target }
+                    : current.before;
+            return { layout: current.start, landed, refused: true };
+        }
         const value = result.value as {
             readonly item: LayoutItem;
             readonly layout: Layout;
@@ -505,6 +512,7 @@ export function createGridLayoutEngine(
         if (
             !geometry ||
             (next.layout === current.preview &&
+                next.landed === current.landed &&
                 next.refused === current.refused &&
                 outside === current.outside)
         ) {
@@ -1388,9 +1396,10 @@ export function createGridLayoutEngine(
                 y: Math.max(0, Math.min(target.y + dy, maxRows - target.h)),
             };
         }
-        // a step the model would refuse (a middleware, a collision) is not taken
+        // a step the model would refuse (a middleware, a collision) is not taken, unless the item
+        // is refused where it is already (a drop that entered where the rules say no): it steps out
         const outcome = previewFor(current, next);
-        if (outcome.refused) return;
+        if (outcome.refused && !current.refused) return;
         const previous = current.landed;
         const landed = outcome.landed;
         // the target is where the item landed (compaction may lift it), so the next step starts

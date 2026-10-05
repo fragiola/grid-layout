@@ -449,6 +449,37 @@ describe("a drop from a drag source, by keyboard", () => {
         }
     });
 
+    it("steps out of a cell the rules refuse, refused until it is out", () => {
+        const grid = setup(two());
+        // nothing past the seventh column
+        grid.model.use((ctx, next) =>
+            ctx.command === "item.add" &&
+            (ctx.payload.item.x ?? 0) + ctx.payload.item.w > 7
+                ? veto()
+                : next(),
+        );
+        // the first free cell for 4 × 1 is (4, 0): refused
+        const source = grid.source({ item: { w: 4, h: 1 } });
+        source.focus();
+        key(source, "Enter");
+        expect(grid.view().dropRefused).toBe(true);
+        key(source, "ArrowRight");
+        expect(grid.view().gesture?.refused).toBe(true);
+        expect(grid.events.at(-1)?.item).toMatchObject({ x: 5 });
+        key(source, "ArrowDown");
+        key(source, "ArrowLeft");
+        key(source, "ArrowLeft");
+        // column 3 is allowed: shown, and from there a refused step is not taken
+        expect(grid.view().dropRefused).toBe(false);
+        key(source, "ArrowRight");
+        expect(grid.view().dropRefused).toBe(false);
+        key(source, "Enter");
+        expect(grid.events.at(-1)).toMatchObject({
+            type: "drop",
+            item: { x: 3, w: 4 },
+        });
+    });
+
     it("takes a held key's repeat for no second press", () => {
         const grid = setup(two());
         const source = grid.source({ item: { w: 2, h: 1 } });
