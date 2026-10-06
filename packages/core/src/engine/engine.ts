@@ -30,6 +30,7 @@ import {
 import { resizeRect, sideEdges } from "../layout/resize";
 import { valueAt } from "../layout/responsive";
 import type { GridRect, Layout, LayoutItem, ResizeSide } from "../layout/types";
+import { sameRect } from "../layout/working";
 import { rulesOf } from "../model/model";
 import type { GridLayoutModel } from "../model/types";
 import { DRAG_EXEMPT, PART_ATTRIBUTE, PRESSING_ATTRIBUTE } from "./dom";
@@ -218,10 +219,6 @@ const ARROWS: Record<string, readonly [number, number]> = {
     ArrowDown: [0, 1],
 };
 
-function sameRect(a: GridRect, b: GridRect): boolean {
-    return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-}
-
 /** Whether two layouts put the same items in the same boxes, in the same order. */
 function samePlaces(a: Layout, b: Layout): boolean {
     return (
@@ -244,6 +241,10 @@ const rectOf = (item: GridRect): GridRect => ({
     w: item.w,
     h: item.h,
 });
+
+/** An overflow that scrolls (or will, once its content grows). */
+const scrolls = (overflow: string | undefined) =>
+    overflow === "auto" || overflow === "scroll" || overflow === "overlay";
 
 /** A key that grabs: Space or Enter, without a modifier, and not a held key's repeat. */
 const grabs = (event: KeyboardEvent) =>
@@ -715,19 +716,19 @@ export function createGridLayoutEngine(
 
     /** Shows `next`: a new view only when what it shows changed. */
     function show(current: Session, next: Preview, outside: boolean): void {
-        const geometry = geometryOf();
         // the command asks for what this preview was asked for (the same places either way)
         current.asked = next.asked;
         // a dry run gives new objects: the same places show nothing new (no render)
         if (
-            !geometry ||
-            (samePlaces(next.layout, current.preview) &&
-                sameRect(next.landed, current.landed) &&
-                next.refused === current.refused &&
-                outside === current.outside)
+            samePlaces(next.layout, current.preview) &&
+            sameRect(next.landed, current.landed) &&
+            next.refused === current.refused &&
+            outside === current.outside
         ) {
             return;
         }
+        const geometry = geometryOf();
+        if (!geometry) return;
         current.preview = next.layout;
         current.landed = next.landed;
         current.refused = next.refused;
@@ -1086,7 +1087,8 @@ export function createGridLayoutEngine(
             // a bounded item never leaves the grid; off it, an unbounded one goes back
             outside = !settings.bounded && offGrid(at, box);
         } else {
-            const { inline, block } = sideEdges(current.side ?? "bottom-end");
+            const edges = sideEdges(current.side ?? "bottom-end");
+            const { inline, block } = edges;
             const dx = point.x - current.grab.x - start.left;
             const dy = point.y - current.grab.y - start.top;
             let { left, top, width, height } = start;
@@ -1136,29 +1138,29 @@ export function createGridLayoutEngine(
     // ─── edge auto-scroll ───────────────────────────────────────────────────────────────────
 
     /**
-     * The nearest ancestor of the root (or the root) that scrolls along an axis, else the page's
-     * scroller (`null` without one). Found once a gesture nears an edge, not every frame.
+     * The nearest ancestor of the root (or the root) that scrolls along each axis, else the
+     * page's scroller (`null` without one). Found once a gesture, not every frame, in one walk:
+     * one style read per ancestor for both axes.
      */
-    function scrollerOf(start: HTMLElement, axis: "x" | "y"): Element | null {
+    function scrollersOf(start: HTMLElement): {
+        x: Element | null;
+        y: Element | null;
+    } {
         const host = start.ownerDocument.defaultView;
         const page = start.ownerDocument.scrollingElement;
+        let x: Element | undefined;
+        let y: Element | undefined;
         for (
             let element: HTMLElement | null = start;
-            element && element !== page;
+            element && element !== page && !(x && y);
             element = element.parentElement
         ) {
             const style = host?.getComputedStyle(element);
-            const overflow = axis === "y" ? style?.overflowY : style?.overflowX;
             // by its style, room or not yet: a grid growing under a gesture makes room
-            if (
-                overflow === "auto" ||
-                overflow === "scroll" ||
-                overflow === "overlay"
-            ) {
-                return element;
-            }
+            if (!x && scrolls(style?.overflowX)) x = element;
+            if (!y && scrolls(style?.overflowY)) y = element;
         }
-        return page;
+        return { x: x ?? page, y: y ?? page };
     }
 
     /**
@@ -1284,10 +1286,7 @@ export function createGridLayoutEngine(
         ) {
             return;
         }
-        current.scrollers ??= {
-            x: scrollerOf(root, "x"),
-            y: scrollerOf(root, "y"),
-        };
+        current.scrollers ??= scrollersOf(root);
         if (axisStep(current, "x") === 0 && axisStep(current, "y") === 0)
             return;
         current.scrolling = host.requestAnimationFrame(() => {
@@ -1988,69 +1987,71 @@ export function createGridLayoutEngine(
         return true;
     }
 
+    // what `get`, `run` and `is` answer, made once (not on every call)
+    const queries: {
+        [K in keyof EngineQueryMap]: (
+            payload: EngineQueryMap[K]["payload"],
+        ) => EngineQueryMap[K]["result"];
+    } = {
+        gesture: () => session?.view,
+        "item-rect-by": ({ itemId }) => view.rects[itemId],
+        "cell-at": ({ clientX, clientY }) => {
+            const geometry = geometryOf();
+            if (!geometry) return undefined;
+            // a zoom on an ancestor resizes nothing: the scale is read again (K5)
+            if (!session) readScale();
+            const point = pointIn(clientX, clientY);
+            // the cell whose box (with the gap after it) holds the point
+            const x = Math.floor(
+                (point.x - geometry.padding[0]) /
+                    (columnWidth(geometry) + geometry.gap[0]),
+            );
+            const y = Math.floor(
+                (point.y - geometry.padding[1]) /
+                    (geometry.rowHeight + geometry.gap[1]),
+            );
+            return {
+                x: Math.max(0, Math.min(x, geometry.cols - 1)),
+                y: Math.max(0, y),
+            };
+        },
+        geometry: () => geometryOf(),
+        dir: () => dir,
+        cells: ({ rows }) =>
+            view.geometry
+                ? gridCells(view.geometry, cellRowCount(view, rows))
+                : [],
+    };
+    const actions: {
+        [K in keyof EngineActionMap]: (
+            payload: EngineActionMap[K]["payload"],
+        ) => EngineActionMap[K]["result"];
+    } = {
+        "cancel-gesture": () => cancel(undefined),
+        "focus-item": ({ itemId }) => focusItem(itemId),
+    };
+    const questions: {
+        [K in keyof EngineQuestionMap]: (
+            payload: EngineQuestionMap[K],
+        ) => boolean;
+    } = {
+        "item-active-by": ({ itemId }) => session?.itemId === itemId,
+    };
+
     const engine: GridLayoutEngine = {
         get(key, ...[payload]) {
-            const queries: {
-                [K in keyof EngineQueryMap]: (
-                    payload: EngineQueryMap[K]["payload"],
-                ) => EngineQueryMap[K]["result"];
-            } = {
-                gesture: () => session?.view,
-                "item-rect-by": ({ itemId }) => view.rects[itemId],
-                "cell-at": ({ clientX, clientY }) => {
-                    const geometry = geometryOf();
-                    if (!geometry) return undefined;
-                    // a zoom on an ancestor resizes nothing: the scale is read again (K5)
-                    if (!session) readScale();
-                    const point = pointIn(clientX, clientY);
-                    // the cell whose box (with the gap after it) holds the point
-                    const x = Math.floor(
-                        (point.x - geometry.padding[0]) /
-                            (columnWidth(geometry) + geometry.gap[0]),
-                    );
-                    const y = Math.floor(
-                        (point.y - geometry.padding[1]) /
-                            (geometry.rowHeight + geometry.gap[1]),
-                    );
-                    return {
-                        x: Math.max(0, Math.min(x, geometry.cols - 1)),
-                        y: Math.max(0, y),
-                    };
-                },
-                geometry: () => geometryOf(),
-                dir: () => dir,
-                cells: ({ rows }) =>
-                    view.geometry
-                        ? gridCells(view.geometry, cellRowCount(view, rows))
-                        : [],
-            };
             const query = queries[key] as (
                 payload: unknown,
             ) => EngineQueryMap[typeof key]["result"];
             return query(payload);
         },
         run(action, ...[payload]) {
-            const actions: {
-                [K in keyof EngineActionMap]: (
-                    payload: EngineActionMap[K]["payload"],
-                ) => EngineActionMap[K]["result"];
-            } = {
-                "cancel-gesture": () => cancel(undefined),
-                "focus-item": ({ itemId }) => focusItem(itemId),
-            };
             const run = actions[action] as (
                 payload: unknown,
             ) => EngineActionMap[typeof action]["result"];
             return run(payload);
         },
         is(key, payload) {
-            const questions: {
-                [K in keyof EngineQuestionMap]: (
-                    payload: EngineQuestionMap[K],
-                ) => boolean;
-            } = {
-                "item-active-by": ({ itemId }) => session?.itemId === itemId,
-            };
             return questions[key](payload);
         },
         subscribe(listener) {

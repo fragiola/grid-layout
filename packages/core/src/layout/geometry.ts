@@ -33,9 +33,9 @@ export function columnWidth(geometry: GridGeometry): number {
     return (width - gap[0] * (cols - 1) - padding[0] * 2) / cols;
 }
 
-/** The pixel size of `units` columns (or rows) of `size` pixels with `gap` between them. */
-function span(units: number, size: number, gap: number): number {
-    return Math.round(size * units + Math.max(0, units - 1) * gap);
+/** @internal The pixel size of `units` columns (or rows) of `size` pixels with `gap` between them. */
+export function pixelSpan(units: number, size: number, gap: number): number {
+    return size * units + Math.max(0, units - 1) * gap;
 }
 
 /**
@@ -95,5 +95,5 @@ export function unitsAt(
 export function containerHeight(geometry: GridGeometry, rows: number): number {
     const { rowHeight, gap, padding } = geometry;
     if (rows <= 0) return padding[1] * 2;
-    return span(rows, rowHeight, gap[1]) + padding[1] * 2;
+    return Math.round(pixelSpan(rows, rowHeight, gap[1])) + padding[1] * 2;
 }

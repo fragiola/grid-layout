@@ -11,9 +11,9 @@ import {
     defaultConstraints,
     itemConstraintsShapeProblem,
     minMaxSize,
+    withinLimits,
 } from "./constraints";
 import { compactLayout } from "./edit";
-import { fitSize } from "./limits";
 import type { Layout, LayoutItem, LayoutRules } from "./types";
 
 /** Why a layout cannot be used. */
@@ -99,9 +99,9 @@ export function normaliseLayout(
         minMaxSize,
     );
     const corrected = layout.map((item) => {
-        const { w, h } = limited
-            ? fitSize(item, rules.cols)
-            : { w: Math.min(item.w, rules.cols), h: item.h };
+        const size = limited ? withinLimits(item) : item;
+        const w = Math.min(size.w, rules.cols);
+        const h = size.h;
         const x = Math.max(0, Math.min(item.x, rules.cols - w));
         let y =
             item.y === Number.POSITIVE_INFINITY

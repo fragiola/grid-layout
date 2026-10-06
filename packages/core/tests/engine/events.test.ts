@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { veto } from "../../src/model/model";
-import { pointer, setup } from "./harness";
+import { cellPoint as at, pointer, setup } from "./harness";
 
 // What a gesture's end tells: whether the model refused the landing it showed.
-
-const at = (x: number, y: number): [number, number] => [
-    10 + (1190 / 12) * x + 5,
-    10 + 60 * y + 5,
-];
 
 describe("a gesture's end", () => {
     it("tells `refused` when a middleware refused the landing, and runs no command", () => {

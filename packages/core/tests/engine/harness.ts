@@ -215,6 +215,11 @@ export function setup(options: HarnessOptions = {}) {
     };
 }
 
+/** The viewport point inside cell (x, y) of the harness grid, 5px from its corner (LTR). */
+export function cellPoint(x: number, y: number): [number, number] {
+    return [10 + (1190 / 12) * x + 5, 10 + 60 * y + 5];
+}
+
 let nextPointer = 1;
 
 /** A pointer: pressed on `target` at a viewport point, moved, released (one frame each). */

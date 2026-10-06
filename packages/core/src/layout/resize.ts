@@ -19,6 +19,40 @@ export function sideEdges(side: ResizeSide): {
     return { inline: inline ?? null, block };
 }
 
+/** The edges a side moves, as {@link sideEdges} gives them. */
+type SideEdges = ReturnType<typeof sideEdges>;
+
+/**
+ * @internal The largest width and height `rect` may take from `edges`, its opposite edges
+ * staying put, inside `cols` columns and `rows` rows.
+ */
+export function roomFor(
+    rect: GridRect,
+    edges: SideEdges,
+    cols: number,
+    rows: number,
+): { w: number; h: number } {
+    return {
+        w: edges.inline === "start" ? rect.x + rect.w : cols - rect.x,
+        h: edges.block === "top" ? rect.y + rect.h : rows - rect.y,
+    };
+}
+
+/** @internal `rect` at `w` × `h`, the edges `edges` does not move where they are. */
+export function anchor(
+    rect: GridRect,
+    edges: SideEdges,
+    w: number,
+    h: number,
+): GridRect {
+    return {
+        x: edges.inline === "start" ? rect.x + rect.w - w : rect.x,
+        y: edges.block === "top" ? rect.y + rect.h - h : rect.y,
+        w,
+        h,
+    };
+}
+
 /** The limits of one axis: the smallest and largest size, `max` already capped by the room. */
 function clampSize(size: number, min: number, max: number): number {
     return Math.max(Math.min(size, max), Math.min(min, max), 1);
@@ -35,41 +69,19 @@ export function resizeRect(
     size: { w: number; h: number },
     bounds: { cols: number; maxRows?: number | undefined },
 ): GridRect {
-    const { inline, block } = sideEdges(side);
+    const edges = sideEdges(side);
+    const { cols } = bounds;
     const maxRows = bounds.maxRows ?? Number.POSITIVE_INFINITY;
-    let { x, y, w, h } = item;
-
-    if (inline === "end") {
-        w = clampSize(
-            size.w,
-            item.minW ?? 1,
-            Math.min(item.maxW ?? bounds.cols, bounds.cols - x),
-        );
-    } else if (inline === "start") {
-        const end = x + w;
-        w = clampSize(
-            size.w,
-            item.minW ?? 1,
-            Math.min(item.maxW ?? bounds.cols, end),
-        );
-        x = end - w;
-    }
-
-    if (block === "bottom") {
-        h = clampSize(
-            size.h,
-            item.minH ?? 1,
-            Math.min(item.maxH ?? maxRows, maxRows - y),
-        );
-    } else if (block === "top") {
-        const end = y + h;
-        h = clampSize(
-            size.h,
-            item.minH ?? 1,
-            Math.min(item.maxH ?? maxRows, end),
-        );
-        y = end - h;
-    }
-
-    return { x, y, w, h };
+    const room = roomFor(item, edges, cols, maxRows);
+    const w = edges.inline
+        ? clampSize(size.w, item.minW ?? 1, Math.min(item.maxW ?? cols, room.w))
+        : item.w;
+    const h = edges.block
+        ? clampSize(
+              size.h,
+              item.minH ?? 1,
+              Math.min(item.maxH ?? maxRows, room.h),
+          )
+        : item.h;
+    return anchor(item, edges, w, h);
 }

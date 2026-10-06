@@ -3,7 +3,11 @@
 // listeners once. Every committed layout is valid: in bounds, settled, and never overlapping
 // unless `allowOverlap`.
 
-import { bottom as bottomOf, collides, collisions } from "../layout/collision";
+import {
+    bottom as bottomOf,
+    collisions,
+    firstCollision,
+} from "../layout/collision";
 import { verticalCompactor } from "../layout/compact";
 import {
     type ConstraintEnv,
@@ -396,7 +400,7 @@ function collision(
     box: LayoutItem,
 ): LayoutItem | undefined {
     if (!state.preventCollision || state.allowOverlap) return undefined;
-    return layout.find((other) => collides(other, box));
+    return firstCollision(layout, box);
 }
 
 /** A placing command's value: the item, the layout, and the pixel constraints it skipped. */

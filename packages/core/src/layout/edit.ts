@@ -4,7 +4,7 @@
 // compacted, and never mutates its input. When nothing changes, or the change is refused (a
 // static item, a collision under `preventCollision`), it returns the very same layout.
 
-import { bottom, collides, firstCollision } from "./collision";
+import { bottom, firstCollision } from "./collision";
 import { verticalCompactor } from "./compact";
 import {
     type ConstraintEnv,
@@ -14,35 +14,19 @@ import {
 } from "./constraints";
 import { moveWorking, pushAside } from "./move";
 import type { Layout, LayoutItem, LayoutRules, ResizeSide } from "./types";
-import { fromWorking, toWorking, type WorkItem } from "./working";
+import {
+    fromWorking,
+    keepIfSame,
+    sameRect,
+    toWorking,
+    type WorkItem,
+} from "./working";
 
 /** An item to add: without `x` and `y` it takes the first free cell, in reading order. */
 export type NewLayoutItem = Omit<LayoutItem, "x" | "y"> & {
     readonly x?: number | undefined;
     readonly y?: number | undefined;
 };
-
-/**
- * `after`, with each item whose geometry did not change replaced by `before`'s own object (by
- * id), and `before` itself when that is every item: "nothing changed" is `===`.
- */
-function keepIfSame(before: Layout, after: Layout): Layout {
-    const previous = new Map(before.map((item) => [item.id, item]));
-    const kept = after.map((item) => {
-        const old = previous.get(item.id);
-        return old !== undefined &&
-            old.x === item.x &&
-            old.y === item.y &&
-            old.w === item.w &&
-            old.h === item.h
-            ? old
-            : item;
-    });
-    return before.length === kept.length &&
-        before.every((item, index) => item === kept[index])
-        ? before
-        : kept;
-}
 
 /**
  * `layout` settled by the rules' compactor; when items may overlap, only by a compactor made for
@@ -112,18 +96,14 @@ export function resizeItem(
     const item = work.find((entry) => entry.id === id);
     if (item === undefined || item.static) return layout;
     const rect = constrainResize(item.source, side, size, rules, layout, env);
+    if (sameRect(rect, item)) return layout;
+    const options = moveOptions(rules);
     if (
-        rect.x === item.x &&
-        rect.y === item.y &&
-        rect.w === item.w &&
-        rect.h === item.h
+        options.preventCollision &&
+        !options.allowOverlap &&
+        firstCollision(layout, { id, ...rect }) !== undefined
     ) {
         return layout;
-    }
-    const options = moveOptions(rules);
-    if (options.preventCollision && !options.allowOverlap) {
-        const target = { id, ...rect };
-        if (layout.some((other) => collides(other, target))) return layout;
     }
     // The resized item keeps the box its handle gives it: what it now covers is pushed past its
     // far edge, never swapped with it (a move's swap would make the resized item jump).
@@ -150,23 +130,19 @@ export function placeItem(
     const work = toWorking(layout);
     const item = work.find((entry) => entry.id === id);
     if (item === undefined || item.static) return layout;
-    const { x, y, w, h } = constrainPlace(
-        item.source,
-        rect,
-        rules,
-        layout,
-        env,
-    );
-    if (x === item.x && y === item.y && w === item.w && h === item.h)
-        return layout;
+    const box = constrainPlace(item.source, rect, rules, layout, env);
+    if (sameRect(box, item)) return layout;
     const options = moveOptions(rules);
-    if (options.preventCollision && !options.allowOverlap) {
-        const target = { id, x, y, w, h };
-        if (layout.some((other) => collides(other, target))) return layout;
+    if (
+        options.preventCollision &&
+        !options.allowOverlap &&
+        firstCollision(layout, { id, ...box }) !== undefined
+    ) {
+        return layout;
     }
-    item.w = w;
-    item.h = h;
-    if (!moveWorking(work, item, x, y, true, options))
+    item.w = box.w;
+    item.h = box.h;
+    if (!moveWorking(work, item, box.x, box.y, true, options))
         pushAside(work, item, options);
     return settle(layout, work, rules);
 }

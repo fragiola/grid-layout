@@ -137,11 +137,8 @@ export interface ItemState {
     readonly placed: boolean;
 }
 
-/** An item: placed at its box, above the others while a gesture holds it. */
-export function itemPart(
-    view: GridLayoutView,
-    itemId: string,
-): Part<ItemState> & { readonly tabIndex: number } {
+/** An item's state: what its handles read too, without its attributes and style. */
+function itemState(view: GridLayoutView, itemId: string): ItemState {
     const item = view.items.get(itemId);
     // a drop holds a new item, never one of these (even under an id the layout already has)
     const gesture =
@@ -149,7 +146,7 @@ export function itemPart(
             ? view.gesture
             : undefined;
     const isStatic = item?.static === true;
-    const state: ItemState = {
+    return {
         itemId,
         item,
         dragging: gesture?.kind === "move",
@@ -170,9 +167,18 @@ export function itemPart(
         handled: view.handled.has(itemId),
         placed: view.rects[itemId] !== undefined,
     };
+}
+
+/** An item: placed at its box, above the others while a gesture holds it. */
+export function itemPart(
+    view: GridLayoutView,
+    itemId: string,
+): Part<ItemState> & { readonly tabIndex: number } {
+    const state = itemState(view, itemId);
+    const held = state.dragging || state.resizing || state.grabbed;
     const rect = view.rects[itemId];
     const style: StructuralStyle = rect
-        ? { ...boxStyle(view, rect), ...(gesture ? { zIndex: 1 } : {}) }
+        ? { ...boxStyle(view, rect), ...(held ? { zIndex: 1 } : {}) }
         : { position: "absolute", top: 0, left: 0, boxSizing: "border-box" };
     return {
         state,
@@ -211,7 +217,7 @@ export function dragHandlePart(
     view: GridLayoutView,
     itemId: string,
 ): Part<DragHandleState> & { readonly tabIndex: number } {
-    const item = itemPart(view, itemId).state;
+    const item = itemState(view, itemId);
     const state: DragHandleState = {
         itemId,
         dragging: item.dragging,
@@ -249,7 +255,7 @@ export function resizeHandlePart(
     itemId: string,
     side: ResizeSide,
 ): Part<ResizeHandleState> {
-    const item = itemPart(view, itemId).state;
+    const item = itemState(view, itemId);
     const gesture = view.gesture;
     const state: ResizeHandleState = {
         itemId,
