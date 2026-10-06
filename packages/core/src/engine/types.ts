@@ -80,6 +80,11 @@ export interface GridLayoutEngineOptions {
     /** the writing direction (default: the root's computed `direction`) */
     dir?: Direction | undefined;
     /**
+     * the scale the grid is drawn at by a CSS transform on an ancestor (default: read from the
+     * root's box on screen, at each gesture's start and on measure, K5)
+     */
+    scale?: number | undefined;
+    /**
      * a native drag entering the root (files, links, text from another window): the item to drop,
      * `false` to refuse, `undefined` to ignore. Asked again on the drop, when the files can be
      * read: that answer can refuse, and gives the drop's data; the size stays the one shown
@@ -215,6 +220,16 @@ export interface GestureEvent {
 
 export type GestureListener = (event: GestureEvent) => void;
 
+/** How many rows of cells: a number, or `auto` (the layout's bottom, the preview's in a gesture, plus one). */
+export type CellRows = number | "auto";
+
+/** One cell of the grid: its column, its row, and its box in pixels (logical). */
+export interface GridCell {
+    readonly x: number;
+    readonly y: number;
+    readonly rect: PixelRect;
+}
+
 /** What `engine.get` reads. */
 export interface EngineQueryMap {
     /** the gesture in progress */
@@ -232,6 +247,14 @@ export interface EngineQueryMap {
     /** the measurements that place items; `undefined` before the width is known */
     geometry: { payload: undefined; result: GridGeometry | undefined };
     dir: { payload: undefined; result: Direction };
+    /**
+     * every cell of `rows` rows, row by row, each placed as an item of 1 × 1 there (K6): what a
+     * grid background draws; none before the width is known
+     */
+    cells: {
+        payload: { readonly rows: CellRows };
+        result: readonly GridCell[];
+    };
 }
 
 /** What `engine.run` does. Engine actions never contain a dot (Dockable rule 13). */

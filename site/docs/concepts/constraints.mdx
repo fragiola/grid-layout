@@ -1,0 +1,146 @@
+---
+title: Constraints
+description: Rules on where items go and what size they take, applied alike to the pointer, the keyboard, drops from outside and commands.
+---
+
+A **constraint** is a rule on where an item may go and what size it may take. Constraints are
+rules of the model, not of a gesture: a drag, a resize, a keyboard step, a drop from outside and an
+app's own `model.run("item.move", …)` all pass through them, and a gesture's preview is exactly
+what its drop commits.
+
+```tsx title="snapped.tsx"
+import {
+    GridLayout,
+    gridBounds,
+    minMaxSize,
+    snapToGrid,
+} from "@fragiola/grid-layout-react";
+
+// a stable list: written inline, it would configure the grid again on every render
+const CONSTRAINTS = [gridBounds, minMaxSize, snapToGrid(2)];
+
+<GridLayout.Root constraints={CONSTRAINTS}>…</GridLayout.Root>
+```
+
+## The built-ins
+
+| constraint | what it does |
+| --- | --- |
+| `gridBounds` (default) | keeps items inside the columns and `maxRows` |
+| `minMaxSize` (default) | keeps sizes within each item's `minW`, `maxW`, `minH` and `maxH` |
+| `containerBounds` | keeps items inside the rows the grid shows (its height), in place of `gridBounds` |
+| `boundedX` | bounds the column only: items may go below `maxRows` |
+| `boundedY` | bounds the row only, by `maxRows` |
+| `aspectRatio(ratio)` | keeps a width-to-height ratio in pixels, the height following the width |
+| `snapToGrid(stepX, stepY?)` | snaps places to multiples of the steps |
+| `minSize(w, h)`, `maxSize(w, h)` | a minimum or maximum size for every item |
+
+Without a `constraints` prop a grid has `defaultConstraints`: `gridBounds`, then `minMaxSize`.
+Leaving one out lifts its rule: without `minMaxSize`, an item's own limits no longer bound a
+resize. Whatever the constraints say, an item stays inside the columns: a committed layout is
+always valid.
+
+A factory given bad values (`snapToGrid(0)`, `aspectRatio(-1)`) never throws: it returns a
+constraint whose `invalid` says why, and the grid refuses it like any invalid option.
+
+## An item's own constraints
+
+An item's constraints come after the grid's, merged, not replaced. A layout is data you save and
+load, so an item stores its constraints as **names**, with the arguments of a factory, and the grid
+resolves them from the registry it is created with:
+
+```tsx title="video.tsx"
+import { aspectRatio, GridLayout, type Layout } from "@fragiola/grid-layout-react";
+
+const layout: Layout = [
+    { id: "video", x: 0, y: 0, w: 6, h: 4, constraints: [{ name: "aspectRatio", args: [16 / 9] }] },
+    { id: "notes", x: 6, y: 0, w: 3, h: 4, constraints: ["boundedX"] },
+];
+
+<GridLayout.Root defaultLayout={layout} constraintRegistry={{ aspectRatio, boundedX }}>
+    …
+</GridLayout.Root>
+```
+
+A name the registry does not hold is refused: the layout is invalid. `item.configure` changes an
+item's constraints like its limits.
+
+## Writing one
+
+A constraint is an object with a `name` and a `position` rule, a `size` rule, or both. Each
+receives the item with the proposed place (or size) already in it, and what it knows about the
+grid: `cols`, `maxRows`, the `layout`, and the grid's pixels (`geometry`, `height`).
+
+```ts title="even-columns.ts"
+import type { LayoutConstraint } from "@fragiola/grid-layout-react";
+
+export const evenColumns: LayoutConstraint = {
+    name: "evenColumns",
+    position: (item) => ({ x: Math.round(item.x / 2) * 2, y: item.y }),
+};
+```
+
+A `size` rule also receives the side the item is resized from (`start`, `bottom-end`, …): the
+opposite edge stays where it is, whatever size the rule gives.
+
+A rule that depends on what is happening (the item's current size, another item, the user) is
+middleware on `item.resize` or `item.move`, which can rewrite or refuse the command:
+
+```ts title="dynamic.ts"
+model.use((ctx, next) => {
+    if (ctx.command === "item.resize" && ctx.payload.w < 4) {
+        ctx.payload = { ...ctx.payload, h: Math.min(ctx.payload.h, 2) };
+    }
+    return next();
+});
+```
+
+## Pixels
+
+`aspectRatio` and `containerBounds` read the grid's pixels (`pixels: true`). The engine gives them
+to each command it runs and each preview it computes; the model never stores them. A plain
+`model.run` from your code has none: those constraints do what they can (`containerBounds` falls
+back to `maxRows`, `aspectRatio` does nothing), and the command's result names them in `skipped`.
+Pass the engine's pixels to apply them:
+
+```ts title="add-video.ts"
+const { model, engine } = useGridLayout();
+model.run(
+    "item.add",
+    { item: { id: "clip", w: 4, h: 1, constraints: [{ name: "aspectRatio", args: [16 / 9] }] } },
+    { env: { geometry: engine.get("geometry") } },
+);
+```
+
+`aspectRatio` counts the gap between rows and the grid's padding, so the ratio holds in pixels as
+closely as whole rows allow: within half a row.
+
+## When they apply
+
+Constraints shape what a person or a command **asks for**: a move, a resize, a keyboard step, a
+drop, an `item.add`. A layout the grid is given (`defaultLayout`, `layout`, `layout.set`) is only
+corrected: inside the columns, overlaps settled, and each item within its limits while the
+constraints keep `minMaxSize`. New constraints do not move the items already placed; their next
+move or resize obeys them. Pixel constraints are not applied again when the grid's width changes:
+resize the items yourself then, with the engine's pixels.
+
+The keyboard follows them too: under `snapToGrid(3)` one arrow goes straight to the next place
+the snap allows.
+
+A `size` rule receives the side pulled; a corner pulls both axes. To know which one really
+changed, compare with the item's committed size (`model.get("item-by", { itemId })`).
+
+## Constraints and compaction
+
+Constraints run first, then the push, then compaction, once each. A position constraint says where
+an item is asked to go; with vertical compaction it may still rise into a gap above, and without
+compaction a move onto another item swaps the two, which may put it on another row. To see
+position constraints alone, use `noCompactor` and move items into free cells.
+
+<Example id="constraint-presets" />
+
+<Example id="aspect-ratio" />
+
+<Example id="custom-constraints" />
+
+<Example id="dynamic-min-max" />

@@ -2,10 +2,15 @@
 // attributes that expose it (present or absent, never "false"), and its structural style (D4, D5).
 // An adapter maps them onto elements and adds nothing.
 
-import type { PixelRect } from "../layout/geometry";
+import { bottom } from "../layout/collision";
+import {
+    type GridGeometry,
+    itemPixels,
+    type PixelRect,
+} from "../layout/geometry";
 import type { LayoutItem, ResizeSide } from "../layout/types";
 import { ITEM_ATTRIBUTE, PART_ATTRIBUTE } from "./dom";
-import type { GridLayoutView } from "./types";
+import type { CellRows, GridCell, GridLayoutView } from "./types";
 
 /** The style a part needs to work: where it is, how big, what is on top. Nothing cosmetic. */
 export interface StructuralStyle {
@@ -384,5 +389,51 @@ export function dragPreviewPart(
             pointerEvents: "none",
             zIndex: 1,
         },
+    };
+}
+
+/** A cell's state: its column and row. */
+export interface CellState {
+    readonly x: number;
+    readonly y: number;
+}
+
+/**
+ * How many rows of cells `rows` gives in `view`: the number, or with `auto` the bottom of the
+ * layout shown (the preview's during a gesture) plus one.
+ */
+export function cellRowCount(view: GridLayoutView, rows: CellRows): number {
+    if (rows !== "auto") return Math.max(0, Math.floor(rows));
+    return bottom(view.gesture?.preview ?? view.layout) + 1;
+}
+
+/** Every cell of `count` rows, row by row, each placed as a 1 × 1 item there. */
+export function gridCells(geometry: GridGeometry, count: number): GridCell[] {
+    const cells: GridCell[] = [];
+    for (let y = 0; y < count; y++) {
+        for (let x = 0; x < geometry.cols; x++) {
+            cells.push({
+                x,
+                y,
+                rect: itemPixels(geometry, { x, y, w: 1, h: 1 }),
+            });
+        }
+    }
+    return cells;
+}
+
+/** A cell of the grid's background: placed as a 1 × 1 item there, mirrored in right-to-left (K6). */
+export function cellPart(
+    view: GridLayoutView,
+    cell: GridCell,
+): Part<CellState> {
+    return {
+        state: { x: cell.x, y: cell.y },
+        attributes: {
+            [PART_ATTRIBUTE]: "cell",
+            "data-x": String(cell.x),
+            "data-y": String(cell.y),
+        },
+        style: boxStyle(view, cell.rect),
     };
 }

@@ -2,6 +2,12 @@
 // compaction strategy. Everything here is logical: `x` counts from the inline-start edge, and a
 // side is `start`/`end`, never left/right; the engine mirrors for right-to-left.
 
+import type {
+    ConstraintRegistry,
+    ItemConstraint,
+    LayoutConstraint,
+} from "./constraints";
+
 /** One item of a layout, in grid units. */
 export interface LayoutItem {
     /** the item's id, unique in its layout */
@@ -28,6 +34,8 @@ export interface LayoutItem {
     readonly draggable?: boolean | undefined;
     /** overrides the grid's `resizable` for this item */
     readonly resizable?: boolean | undefined;
+    /** its own constraints, after the grid's: names the model's registry holds (K3) */
+    readonly constraints?: readonly ItemConstraint[] | undefined;
 }
 
 /** A layout: its items, in the order the app gave them. */
@@ -75,6 +83,8 @@ export type CompactType = "vertical" | "horizontal" | "none";
 export interface Compactor {
     /** how a move pushes the items it collides with */
     readonly type: CompactType;
+    /** it is made for a grid with `allowOverlap`, which runs it (and skips any other compactor) */
+    readonly overlap?: boolean | undefined;
     /**
      * The layout settled: same items, same order, none overlapping (statics never move). Never
      * mutates its input.
@@ -94,4 +104,8 @@ export interface LayoutRules {
     readonly preventCollision?: boolean | undefined;
     /** items may overlap: nothing is pushed and nothing settles */
     readonly allowOverlap?: boolean | undefined;
+    /** what every place and size passes through (default: `gridBounds`, then `minMaxSize`) */
+    readonly constraints?: readonly LayoutConstraint[] | undefined;
+    /** the constraints items name in their own `constraints` */
+    readonly constraintRegistry?: ConstraintRegistry | undefined;
 }

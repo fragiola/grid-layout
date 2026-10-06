@@ -36,6 +36,12 @@
             "import": "./dist/index.js",
             "default": "./dist/index.js"
         },
+        "./compactors": {
+            "@fragiola/source": "./src/compactors.ts",
+            "types": "./dist/compactors.d.ts",
+            "import": "./dist/compactors.js",
+            "default": "./dist/compactors.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [
@@ -49,6 +55,11 @@
                 "types": "./dist/index.d.ts",
                 "import": "./dist/index.js",
                 "default": "./dist/index.js"
+            },
+            "./compactors": {
+                "types": "./dist/compactors.d.ts",
+                "import": "./dist/compactors.js",
+                "default": "./dist/compactors.js"
             },
             "./package.json": "./package.json"
         }

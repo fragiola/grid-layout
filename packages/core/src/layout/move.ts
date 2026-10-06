@@ -42,7 +42,16 @@ export function moveWorking(
     if (item.static) return false;
     const nextX = x ?? item.x;
     const nextY = y ?? item.y;
-    if (nextX === item.x && nextY === item.y) return false;
+    // the same place, both axes given: nothing to do. With an axis left out, the item stays but
+    // what it covers is resolved again, as a swap toward the start needs (react-grid-layout#2252)
+    if (
+        x !== undefined &&
+        y !== undefined &&
+        nextX === item.x &&
+        nextY === item.y
+    ) {
+        return false;
+    }
 
     const oldX = item.x;
     const oldY = item.y;

@@ -47,6 +47,14 @@
                     "path": "concepts/collisions-and-compaction"
                 },
                 {
+                    "label": "Constraints",
+                    "path": "concepts/constraints"
+                },
+                {
+                    "label": "Compactors",
+                    "path": "concepts/compactors"
+                },
+                {
                     "label": "Dragging",
                     "path": "concepts/dragging"
                 },
@@ -104,6 +112,14 @@
                 {
                     "label": "Mobile and touch",
                     "path": "guides/mobile-and-touch"
+                },
+                {
+                    "label": "Scaled and zoomed grids",
+                    "path": "guides/scaled-and-zoomed-grids"
+                },
+                {
+                    "label": "A grid background",
+                    "path": "guides/grid-background"
                 }
             ]
         },

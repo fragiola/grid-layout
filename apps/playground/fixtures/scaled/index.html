@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Scaled grid layout fixture</title>
+        <style>
+            /* the fixture's own few lines: a page to read, and a parent scaled by CSS */
+            body { margin: 0; padding: 60px 80px 40px; font: 13px/1.2 system-ui, sans-serif; }
+            [data-testid="canvas"] { transform-origin: 0 0; width: 960px; }
+            [data-grid-layout-part="root"] { width: 960px; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="resize-handle"] { position: absolute; width: 12px; height: 12px; background: #333; inset-block-end: 0; inset-inline-end: 0; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountScaledFixture } from "../../src/fixture/scaled-fixture.tsx";
+            mountScaledFixture();
+        </script>
+    </body>
+</html>

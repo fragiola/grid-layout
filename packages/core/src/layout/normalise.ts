@@ -4,9 +4,14 @@
 // the MIT licence (see the root LICENSE): an item past the last column moves back in, `y:
 // Infinity` means "below everything so far" (react-grid-layout#2161), and statics that overlap
 // are moved apart, downward. Unlike it, an item left of the first column keeps its width, and
-// sizes are brought within the item's own limits.
+// sizes are brought within the item's own limits (while the grid's constraints keep `minMaxSize`).
 
 import { bottom, firstCollision } from "./collision";
+import {
+    defaultConstraints,
+    itemConstraintsShapeProblem,
+    minMaxSize,
+} from "./constraints";
 import { compactLayout } from "./edit";
 import { fitSize } from "./limits";
 import type { Layout, LayoutItem, LayoutRules } from "./types";
@@ -39,10 +44,8 @@ export function layoutProblems(layout: unknown): LayoutProblem[] {
             fail("an item is an object");
             return;
         }
-        const { id, x, y, w, h, minW, maxW, minH, maxH } = item as Record<
-            string,
-            unknown
-        >;
+        const { id, x, y, w, h, minW, maxW, minH, maxH, constraints } =
+            item as Record<string, unknown>;
         if (typeof id !== "string" || id === "")
             fail("id must be a non-empty string");
         else if (ids.has(id)) fail(`id "${id}" is used twice`);
@@ -70,6 +73,8 @@ export function layoutProblems(layout: unknown): LayoutProblem[] {
                 fail(`${name} must be an integer of at least 1`);
             }
         }
+        const shape = itemConstraintsShapeProblem(constraints);
+        if (shape) fail(shape);
     });
     return problems;
 }
@@ -89,8 +94,14 @@ export function normaliseLayout(
 
     const placed: LayoutItem[] = [];
     let changed = false;
+    // an item's own limits hold while the grid's constraints keep `minMaxSize`
+    const limited = (rules.constraints ?? defaultConstraints).includes(
+        minMaxSize,
+    );
     const corrected = layout.map((item) => {
-        const { w, h } = fitSize(item, rules.cols);
+        const { w, h } = limited
+            ? fitSize(item, rules.cols)
+            : { w: Math.min(item.w, rules.cols), h: item.h };
         const x = Math.max(0, Math.min(item.x, rules.cols - w));
         let y =
             item.y === Number.POSITIVE_INFINITY

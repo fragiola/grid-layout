@@ -5,6 +5,7 @@ import {
     noCompactor,
     verticalCompactor,
 } from "../../src/layout/compact";
+import { defaultConstraints } from "../../src/layout/constraints";
 import { compactLayout } from "../../src/layout/edit";
 import type { Layout, LayoutItem } from "../../src/layout/types";
 import {
@@ -55,6 +56,8 @@ describe("creating a model", () => {
             compactor: verticalCompactor,
             preventCollision: false,
             allowOverlap: false,
+            constraints: defaultConstraints,
+            constraintRegistry: {},
         });
         expect(model.get("breakpoint")).toBe("default");
         expect(Object.isFrozen(model.state)).toBe(true);

@@ -26,6 +26,7 @@ looking for its feature would search, and `order` is its place inside the catego
 | `layouts` | what the layout itself does: corrected on load, statics, adding and removing, saving |
 | `drag-and-drop` | moving items: handles, controls that never drag, bounds |
 | `resizing` | sizing items: the eight sides, minimum and maximum sizes |
+| `constraints` | rules on where items go and what size they take: bounds, aspect ratios, snapping, custom rules |
 | `compaction` | how items settle: vertical, horizontal, none, collisions, overlap |
 | `keyboard` | moving and resizing without a pointer, and what is announced |
 | `external-drop` | things from outside the grid becoming items: drag sources, a toolbox, drop rules, files |
@@ -71,9 +72,10 @@ else.
 
 ## Rules
 
-- **Copyable imports only**: `react`, `@fragiola/grid-layout-react` (it re-exports the core),
-  `lucide-react`, Fragiola UI (`#/components/ui/*`, `#/components/atoms/*`, `#/lib/cn`), and
-  relative files inside `src/examples/`. `#/` is the app's `src/`; `@name` is reserved for
+- **Copyable imports only**: `react`, `@fragiola/grid-layout-react` (it re-exports the core) and
+  its opt-in `@fragiola/grid-layout-react/compactors` entry, `lucide-react`, Fragiola UI
+  (`#/components/ui/*`, `#/components/atoms/*`, `#/lib/cn`), and relative files inside
+  `src/examples/`. `#/` is the app's `src/`; `@name` is reserved for
   packages (site export contract, §6). `tests/examples.test.ts` enforces it.
 - **Theme-agnostic**: style through palette roles (`bg-palette-base`, …) and the theme tokens
   (`--gl-*`), never fixed colours, so the example works in all five themes.

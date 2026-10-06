@@ -12,11 +12,13 @@ export {
 } from "./gridLayoutRef";
 export {
     type BreakpointInfo,
+    type CellHookResult,
     type DragSourceHookResult,
     type DragSourceOptions,
     type DropDetails,
     type PartHookResult,
     useBreakpoint,
+    useCells,
     useDragHandle,
     useDragPreview,
     useDragSource,
@@ -31,6 +33,8 @@ export {
 } from "./hooks";
 export * as GridLayout from "./parts";
 export {
+    Cells,
+    type CellsProps,
     DragHandle,
     type DragHandleProps,
     DragPreview,

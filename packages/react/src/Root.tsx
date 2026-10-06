@@ -5,21 +5,25 @@ import {
     type Breakpoints,
     breakpointFor,
     type Compactor,
+    type ConstraintRegistry,
     createGridLayoutEngine,
     createGridLayoutModel,
     DEFAULT_BREAKPOINT,
     type Direction,
+    defaultConstraints,
     type ExternalDragAnswer,
     type GestureEvent,
     type GridLayoutEngine,
     type GridLayoutEngineOptions,
     type GridLayoutModel,
     type Layout,
+    type LayoutConstraint,
     type LayoutItem,
     normaliseLayout,
     type PerBreakpoint,
     type RootState,
     rootPart,
+    sameItemConstraints,
     verticalCompactor,
 } from "@fragiola/grid-layout";
 import type * as React from "react";
@@ -86,6 +90,17 @@ export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     preventCollision?: boolean | undefined;
     /** items may overlap: nothing is pushed and nothing settles */
     allowOverlap?: boolean | undefined;
+    /**
+     * what every place and size passes through, by pointer, keyboard, drop or command (default:
+     * `gridBounds`, then `minMaxSize`). Keep it stable (module level or `useMemo`): a new list
+     * configures the grid again
+     */
+    constraints?: readonly LayoutConstraint[] | undefined;
+    /**
+     * the constraints items name in their own `constraints`, by name (`{ aspectRatio, boundedX }`):
+     * read when the grid is created
+     */
+    constraintRegistry?: ConstraintRegistry | undefined;
     /** one row's height in pixels, for every breakpoint or each one (default 150) */
     rowHeight?: PerBreakpoint<number> | undefined;
     /**
@@ -118,6 +133,11 @@ export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     autoScroll?: GridLayoutEngineOptions["autoScroll"];
     /** the writing direction (default: the root's computed `direction`); set as `dir` too */
     dir?: Direction | undefined;
+    /**
+     * the scale a CSS transform on an ancestor draws the grid at (default: read from the root's
+     * box on screen, so a scaled grid needs none)
+     */
+    scale?: number | undefined;
     onDragStart?: GestureCallback | undefined;
     onDrag?: GestureCallback | undefined;
     onDragStop?: GestureCallback | undefined;
@@ -155,6 +175,7 @@ const ITEM_KEYS = [
     "static",
     "draggable",
     "resizable",
+    "constraints",
 ] as const satisfies readonly (keyof LayoutItem)[];
 
 /** The rules' default breakpoints: one, at every width. */
@@ -187,7 +208,11 @@ export function sameLayout(a: Layout, b: Layout): boolean {
                 const other = b[index];
                 return (
                     other !== undefined &&
-                    ITEM_KEYS.every((key) => item[key] === other[key])
+                    ITEM_KEYS.every((key) =>
+                        key === "constraints"
+                            ? sameItemConstraints(item[key], other[key])
+                            : item[key] === other[key],
+                    )
                 );
             }))
     );
@@ -219,6 +244,8 @@ export function Root(props: RootProps) {
         compactor,
         preventCollision,
         allowOverlap,
+        constraints,
+        constraintRegistry,
         rowHeight,
         gap,
         padding,
@@ -232,6 +259,7 @@ export function Root(props: RootProps) {
         touchTolerance,
         autoScroll,
         dir,
+        scale,
         onDragStart: _onDragStart,
         onDrag: _onDrag,
         onDragStop: _onDragStop,
@@ -261,6 +289,8 @@ export function Root(props: RootProps) {
             compactor,
             preventCollision,
             allowOverlap,
+            constraints,
+            constraintRegistry,
         });
         // the breakpoint the grid starts at, before the engine measures (or is told) another
         const initial = created.state.breakpoint;
@@ -279,6 +309,7 @@ export function Root(props: RootProps) {
             autoScroll,
             breakpoint,
             dir,
+            scale,
         });
         return {
             model: created,
@@ -309,6 +340,7 @@ export function Root(props: RootProps) {
             autoScroll,
             breakpoint,
             dir,
+            scale,
             onExternalDrag,
             createId,
         });
@@ -412,6 +444,7 @@ export function Root(props: RootProps) {
                 compactor: compactor ?? verticalCompactor,
                 preventCollision: preventCollision ?? false,
                 allowOverlap: allowOverlap ?? false,
+                constraints: constraints ?? defaultConstraints,
             },
         });
         // the same error a mount with these props throws: rules that cannot be used
@@ -427,6 +460,7 @@ export function Root(props: RootProps) {
         compactor,
         preventCollision,
         allowOverlap,
+        constraints,
     ]);
 
     // the controlled layouts: the breakpoints the prop names hold what it says, settled in their

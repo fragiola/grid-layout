@@ -1,6 +1,11 @@
 // The grid layout's model: its items and its rules (D3). Every change is a command through a
 // middleware chain; reads go through `get` and `is` keys, typed by the registries below.
 
+import type {
+    ConstraintEnv,
+    ConstraintRegistry,
+    LayoutConstraint,
+} from "../layout/constraints";
 import type { NewLayoutItem } from "../layout/edit";
 import type { Breakpoints } from "../layout/responsive";
 import type {
@@ -33,6 +38,10 @@ export interface GridLayoutState {
     readonly preventCollision: boolean;
     /** items may overlap: nothing is pushed and nothing settles */
     readonly allowOverlap: boolean;
+    /** what every place and size passes through, before the items' own (K1) */
+    readonly constraints: readonly LayoutConstraint[];
+    /** the constraints items name in their own `constraints` (set at creation) */
+    readonly constraintRegistry: ConstraintRegistry;
     /** the breakpoint whose layout the grid shows and edits */
     readonly breakpoint: string;
     /** the layout of each breakpoint (one, {@link DEFAULT_BREAKPOINT}, until responsive grids) */
@@ -61,13 +70,30 @@ export interface GridLayoutModelOptions {
     compactor?: Compactor | undefined;
     preventCollision?: boolean | undefined;
     allowOverlap?: boolean | undefined;
+    /** what every place and size passes through (default: `gridBounds`, then `minMaxSize`) */
+    constraints?: readonly LayoutConstraint[] | undefined;
+    /**
+     * the constraints items may name, by name: constraints, or factories their `args` are given
+     * to (`{ aspectRatio, boundedX }`)
+     */
+    constraintRegistry?: ConstraintRegistry | undefined;
 }
 
-/** The fields of an item `item.configure` changes: its limits and its flags, never its place. */
+/**
+ * The fields of an item `item.configure` changes: its limits, its flags and its constraints, never
+ * its place.
+ */
 export type ItemSettings = Partial<
     Pick<
         LayoutItem,
-        "minW" | "maxW" | "minH" | "maxH" | "static" | "draggable" | "resizable"
+        | "minW"
+        | "maxW"
+        | "minH"
+        | "maxH"
+        | "static"
+        | "draggable"
+        | "resizable"
+        | "constraints"
     >
 >;
 
@@ -75,7 +101,11 @@ export type ItemSettings = Partial<
 export type GridSettings = Partial<
     Pick<
         GridLayoutState,
-        "maxRows" | "compactor" | "preventCollision" | "allowOverlap"
+        | "maxRows"
+        | "compactor"
+        | "preventCollision"
+        | "allowOverlap"
+        | "constraints"
     >
 > & {
     /** the columns, for every breakpoint or each one */
@@ -88,6 +118,17 @@ export type GridSettings = Partial<
      */
     readonly breakpoint?: string | undefined;
 };
+
+/**
+ * What a command that places or sizes an item returns: the item and the layout, settled, and the
+ * constraints it skipped for want of an engine's pixels (absent when none).
+ */
+export interface PlaceResult {
+    readonly item: LayoutItem;
+    readonly layout: Layout;
+    /** the pixel constraints left out: the command ran without an engine's `env` (K2) */
+    readonly skipped?: readonly string[];
+}
 
 /** The breakpoint a command edits: the active one unless it names another. */
 export interface AtBreakpoint {
@@ -108,7 +149,7 @@ export interface CommandMap {
      */
     "item.add": {
         payload: { readonly item: NewLayoutItem } & AtBreakpoint;
-        result: { readonly item: LayoutItem; readonly layout: Layout };
+        result: PlaceResult;
     };
     /** removes an item. Returns its id */
     "item.remove": {
@@ -116,7 +157,8 @@ export interface CommandMap {
         result: { readonly itemId: string };
     };
     /**
-     * moves an item to a cell inside the grid, pushing what it lands on (a static is refused;
+     * moves an item toward a cell inside the columns: its constraints decide where it lands (by
+     * default inside the columns and `maxRows`), pushing what it lands on (a static is refused;
      * under `preventCollision`, an occupied cell is a `collision`). Returns the item, settled
      */
     "item.move": {
@@ -125,11 +167,12 @@ export interface CommandMap {
             readonly x: number;
             readonly y: number;
         } & AtBreakpoint;
-        result: { readonly item: LayoutItem; readonly layout: Layout };
+        result: PlaceResult;
     };
     /**
-     * resizes an item from `side` (default `bottom-end`), the opposite edge staying put, within
-     * its limits and the grid, pushing what it grows into. Returns the item, settled
+     * resizes an item from `side` (default `bottom-end`), the opposite edge staying put, through
+     * its constraints (by default its limits and the grid's bounds), pushing what it grows into.
+     * Returns the item, settled
      */
     "item.resize": {
         payload: {
@@ -138,7 +181,7 @@ export interface CommandMap {
             readonly h: number;
             readonly side?: ResizeSide | undefined;
         } & AtBreakpoint;
-        result: { readonly item: LayoutItem; readonly layout: Layout };
+        result: PlaceResult;
     };
     /**
      * moves and resizes an item at once (a keyboard gesture that did both): the move, then the
@@ -152,7 +195,7 @@ export interface CommandMap {
             readonly w: number;
             readonly h: number;
         } & AtBreakpoint;
-        result: { readonly item: LayoutItem; readonly layout: Layout };
+        result: PlaceResult;
     };
     /** changes an item's limits and flags; its size comes back within the new limits */
     "item.configure": {
@@ -254,6 +297,8 @@ export type CommandContext = {
         readonly dryRun: boolean;
         /** the committed state the command applies to */
         readonly state: GridLayoutState;
+        /** the pixels the engine gave the run (K2): empty for a plain `model.run` */
+        readonly env: ConstraintEnv;
     };
 }[CommandName];
 
@@ -340,6 +385,22 @@ export type QuestionKey = keyof QuestionMap;
 /** The payload of a command that takes none. */
 export type NoPayload = Record<string, never>;
 
+/** What a run, a check or a can takes besides the payload. */
+export interface RunOptions {
+    /**
+     * the pixels pixel constraints read (`aspectRatio`, `containerBounds`): an engine passes its
+     * own; never stored (K2)
+     */
+    readonly env?: ConstraintEnv | undefined;
+}
+
+/** The arguments of a command after its name: the payload, then the run's options. */
+export type RunArgs<P> = [P] extends [undefined]
+    ? [payload?: undefined, options?: RunOptions]
+    : NoPayload extends P
+      ? [payload?: P, options?: RunOptions]
+      : [payload: P, options?: RunOptions];
+
 /** The arguments after a key: the payload, optional when the key takes none. */
 export type PayloadArgs<P> = [P] extends [undefined]
     ? []
@@ -354,17 +415,17 @@ export interface GridLayoutModel {
     /** runs a command through the middleware and commits it */
     run<C extends CommandName>(
         command: C,
-        ...args: PayloadArgs<PayloadOf<C>>
+        ...args: RunArgs<PayloadOf<C>>
     ): CommandResult<ResultOf<C>>;
     /** whether the command would apply (a dry run through the middleware) */
     can<C extends CommandName>(
         command: C,
-        ...args: PayloadArgs<PayloadOf<C>>
+        ...args: RunArgs<PayloadOf<C>>
     ): boolean;
     /** the command's result without committing it (a dry run through the middleware) */
     check<C extends CommandName>(
         command: C,
-        ...args: PayloadArgs<PayloadOf<C>>
+        ...args: RunArgs<PayloadOf<C>>
     ): CommandResult<ResultOf<C>>;
     /** reads a value */
     get<K extends QueryKey>(

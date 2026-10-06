@@ -44,6 +44,7 @@ function Everything(props: {
                 )}
             </GridLayout.Items>
             <GridLayout.Placeholder />
+            <GridLayout.Cells rows={1} />
         </GridLayout.Root>
     );
 }
@@ -70,6 +71,7 @@ describe("the primitives", () => {
             all.map((element) => element.dataset.gridLayoutPart).sort(),
         ).toEqual(
             [
+                ...Array.from({ length: 12 }, () => "cell"),
                 "drag-handle",
                 "drag-handle",
                 "item",
