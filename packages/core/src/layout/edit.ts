@@ -1,12 +1,18 @@
 // The layout changes a grid makes, as pure functions: move, resize, add and remove an item, and
-// settle. Each returns a layout that is in bounds, never overlapping (unless `allowOverlap`) and
+// settle. A place or a size goes through the rules' constraints first (K1), compaction last.
+// Each returns a layout that is in bounds, never overlapping (unless `allowOverlap`) and
 // compacted, and never mutates its input. When nothing changes, or the change is refused (a
 // static item, a collision under `preventCollision`), it returns the very same layout.
 
 import { bottom, collides, firstCollision } from "./collision";
 import { verticalCompactor } from "./compact";
+import {
+    type ConstraintEnv,
+    constrainMove,
+    constrainPlace,
+    constrainResize,
+} from "./constraints";
 import { moveWorking, pushAside } from "./move";
-import { resizeRect } from "./resize";
 import type { Layout, LayoutItem, LayoutRules, ResizeSide } from "./types";
 import { fromWorking, toWorking, type WorkItem } from "./working";
 
@@ -38,10 +44,13 @@ function keepIfSame(before: Layout, after: Layout): Layout {
         : kept;
 }
 
-/** `layout` settled by the rules' compactor, unless items may overlap. */
+/**
+ * `layout` settled by the rules' compactor; when items may overlap, only by a compactor made for
+ * it (`overlap`).
+ */
 export function compactLayout(layout: Layout, rules: LayoutRules): Layout {
-    if (rules.allowOverlap) return layout;
     const compactor = rules.compactor ?? verticalCompactor;
+    if (rules.allowOverlap && compactor.overlap !== true) return layout;
     return keepIfSame(layout, compactor.compact(layout, rules.cols));
 }
 
@@ -61,23 +70,10 @@ function moveOptions(rules: LayoutRules) {
     };
 }
 
-/** A column and row for an item of `w` × `h`, kept inside the grid. */
-function inBounds(
-    rules: LayoutRules,
-    size: { w: number; h: number },
-    x: number,
-    y: number,
-): { x: number; y: number } {
-    const maxRows = rules.maxRows ?? Number.POSITIVE_INFINITY;
-    return {
-        x: Math.max(0, Math.min(x, rules.cols - size.w)),
-        y: Math.max(0, Math.min(y, maxRows - size.h)),
-    };
-}
-
 /**
- * The item `id` moved to `x`/`y` (kept inside the grid), pushing what it lands on, then settled.
- * A static item never moves; under `preventCollision` a move into an occupied cell is refused.
+ * The item `id` moved to `x`/`y` (through its constraints, kept inside the grid), pushing what it
+ * lands on, then settled. A static item never moves; under `preventCollision` a move into an
+ * occupied cell is refused. `env` gives pixel constraints the engine's measurements.
  */
 export function moveItem(
     layout: Layout,
@@ -85,11 +81,12 @@ export function moveItem(
     x: number,
     y: number,
     rules: LayoutRules,
+    env?: ConstraintEnv,
 ): Layout {
     const work = toWorking(layout);
     const item = work.find((entry) => entry.id === id);
     if (item === undefined || item.static) return layout;
-    const target = inBounds(rules, item, x, y);
+    const target = constrainMove(item.source, x, y, rules, layout, env);
     if (
         !moveWorking(work, item, target.x, target.y, true, moveOptions(rules))
     ) {
@@ -99,9 +96,9 @@ export function moveItem(
 }
 
 /**
- * The item `id` resized to `size` from `side` (the opposite edge stays put, the item's limits and
- * the grid's bounds hold), pushing what it grows into, then settled. Under `preventCollision` a
- * resize into an occupied cell is refused.
+ * The item `id` resized to `size` from `side` (the opposite edge stays put, its constraints hold:
+ * by default its limits and the grid's bounds), pushing what it grows into, then settled. Under
+ * `preventCollision` a resize into an occupied cell is refused.
  */
 export function resizeItem(
     layout: Layout,
@@ -109,11 +106,12 @@ export function resizeItem(
     size: { w: number; h: number },
     side: ResizeSide,
     rules: LayoutRules,
+    env?: ConstraintEnv,
 ): Layout {
     const work = toWorking(layout);
     const item = work.find((entry) => entry.id === id);
     if (item === undefined || item.static) return layout;
-    const rect = resizeRect(item.source, side, size, rules);
+    const rect = constrainResize(item.source, side, size, rules, layout, env);
     if (
         rect.x === item.x &&
         rect.y === item.y &&
@@ -138,7 +136,7 @@ export function resizeItem(
 }
 
 /**
- * The item `id` given the box `rect` at once (kept within its limits and the grid, at that place),
+ * The item `id` given the box `rect` at once (through its constraints: the size, then the place),
  * pushing what it lands on or grows into, then settled. A move to the same box and size is a
  * move; a new size in the same place grows from the bottom-end, as a resize from there does.
  */
@@ -147,23 +145,17 @@ export function placeItem(
     id: string,
     rect: { x: number; y: number; w: number; h: number },
     rules: LayoutRules,
+    env?: ConstraintEnv,
 ): Layout {
     const work = toWorking(layout);
     const item = work.find((entry) => entry.id === id);
     if (item === undefined || item.static) return layout;
-    const maxRows = rules.maxRows ?? Number.POSITIVE_INFINITY;
-    const { source } = item;
-    const x = Math.max(0, Math.min(rect.x, rules.cols - 1));
-    const y = Math.max(0, rect.y);
-    const w = Math.max(
-        Math.min(rect.w, source.maxW ?? rules.cols, rules.cols - x),
-        Math.min(source.minW ?? 1, rules.cols - x),
-        1,
-    );
-    const h = Math.max(
-        Math.min(rect.h, source.maxH ?? maxRows, maxRows - y),
-        Math.min(source.minH ?? 1, maxRows - y),
-        1,
+    const { x, y, w, h } = constrainPlace(
+        item.source,
+        rect,
+        rules,
+        layout,
+        env,
     );
     if (x === item.x && y === item.y && w === item.w && h === item.h)
         return layout;
@@ -202,23 +194,40 @@ export function firstFreeCell(
 
 /**
  * `layout` with `item` added at its `x`/`y`, pushing what is there (or at the first free cell
- * when it names none), then settled.
+ * when it names none), then settled. Its size, then its place, go through its constraints.
  */
 export function addItem(
     layout: Layout,
     item: NewLayoutItem,
     rules: LayoutRules,
+    env?: ConstraintEnv,
 ): Layout {
-    const w = Math.min(item.w, rules.cols);
-    const size = { w, h: item.h };
-    const wanted =
+    // sized from the grid's corner (the whole grid is its room), then placed
+    const at = { ...item, x: 0, y: 0 };
+    const { w, h } = constrainResize(
+        at,
+        "bottom-end",
+        item,
+        rules,
+        layout,
+        env,
+    );
+    const cell =
         item.x === undefined || item.y === undefined
-            ? firstFreeCell(layout, size, rules.cols)
-            : inBounds(rules, size, item.x, item.y);
+            ? firstFreeCell(layout, { w, h }, rules.cols)
+            : { x: item.x, y: item.y };
+    const wanted = constrainMove(
+        { ...at, w, h },
+        cell.x,
+        cell.y,
+        rules,
+        layout,
+        env,
+    );
     if (item.static || rules.allowOverlap) {
         // a static takes its cell, below any static already there, and the others settle around
         // it (as normalisation separates statics)
-        let placed: LayoutItem = { ...item, ...wanted, w };
+        let placed: LayoutItem = { ...item, ...wanted, w, h };
         if (item.static && !rules.allowOverlap) {
             const statics = layout.filter((entry) => entry.static);
             while (firstCollision(statics, placed) !== undefined) {
@@ -230,7 +239,7 @@ export function addItem(
     // the new item starts below everything, then moves in like a dropped one
     const work = toWorking([
         ...layout,
-        { ...item, x: wanted.x, y: bottom(layout), w },
+        { ...item, x: wanted.x, y: bottom(layout), w, h },
     ]);
     const added = work[work.length - 1];
     if (added !== undefined) {

@@ -4,10 +4,17 @@
 // preview, which changes only when the item would land somewhere else. The keyboard grabs, moves,
 // resizes and drops an item (D10). A drop brings a new item from outside: from a drag source by
 // pointer or keyboard, or a native drag from another window; its preview is the model's dry run
-// of `item.add` (X1, X2, X6). Every gesture ends in one command, or none. All DOM access goes
-// through the root's document and window (D13).
+// of `item.add` (X1, X2, X6). Every gesture ends in one command, or none, and its preview is that
+// command's dry run with the same pixels (`env`), so the constraints shape both alike (K1, K2). A
+// grid in a CSS-scaled parent reads the scale off its own box (K5). All DOM access goes through
+// the root's document and window (D13).
 
 import { bottom } from "../layout/collision";
+import {
+    type ConstraintEnv,
+    constrainMove,
+    constrainResize,
+} from "../layout/constraints";
 import { firstFreeCell } from "../layout/edit";
 import {
     cellAt,
@@ -18,13 +25,13 @@ import {
     type PixelRect,
     unitsAt,
 } from "../layout/geometry";
-import { fitSize } from "../layout/limits";
 import { resizeRect, sideEdges } from "../layout/resize";
 import { valueAt } from "../layout/responsive";
 import type { GridRect, Layout, LayoutItem, ResizeSide } from "../layout/types";
 import { rulesOf } from "../model/model";
 import type { GridLayoutModel } from "../model/types";
 import { DRAG_EXEMPT, PART_ATTRIBUTE, PRESSING_ATTRIBUTE } from "./dom";
+import { cellRowCount, gridCells } from "./parts";
 import type {
     Direction,
     DropItem,
@@ -61,6 +68,7 @@ interface Settings {
         | { readonly threshold: number; readonly speed: number }
         | undefined;
     readonly dir: Direction | undefined;
+    readonly scale: number | undefined;
     readonly onExternalDrag: GridLayoutEngineOptions["onExternalDrag"];
     readonly createId: GridLayoutEngineOptions["createId"];
 }
@@ -87,6 +95,12 @@ function settingsOf(options: GridLayoutEngineOptions): Settings {
                       speed: options.autoScroll?.speed ?? 20,
                   },
         dir: options.dir,
+        scale:
+            options.scale !== undefined &&
+            Number.isFinite(options.scale) &&
+            options.scale > 0
+                ? options.scale
+                : undefined,
         onExternalDrag: options.onExternalDrag,
         createId: options.createId,
     };
@@ -117,6 +131,10 @@ interface Session {
     readonly startRect: PixelRect;
     /** where it would land: the item's cell and size */
     target: GridRect;
+    /** what the preview shown was asked for: what the gesture's command asks for */
+    asked: GridRect;
+    /** the height the root showed when it started: what pixel constraints read throughout */
+    readonly height: number;
     /** the layout if it ended now, the held item in it, and whether the model refuses it */
     preview: Layout;
     landed: LayoutItem;
@@ -168,6 +186,8 @@ interface Preview {
     readonly layout: Layout;
     readonly landed: LayoutItem;
     readonly refused: boolean;
+    /** what it was asked for */
+    readonly asked: GridRect;
 }
 
 /**
@@ -195,6 +215,22 @@ const ARROWS: Record<string, readonly [number, number]> = {
 
 function sameRect(a: GridRect, b: GridRect): boolean {
     return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+/** Whether two layouts put the same items in the same boxes, in the same order. */
+function samePlaces(a: Layout, b: Layout): boolean {
+    return (
+        a === b ||
+        (a.length === b.length &&
+            a.every((item, index) => {
+                const other = b[index];
+                return (
+                    other !== undefined &&
+                    other.id === item.id &&
+                    sameRect(item, other)
+                );
+            }))
+    );
 }
 
 const rectOf = (item: GridRect): GridRect => ({
@@ -243,6 +279,8 @@ export function createGridLayoutEngine(
     let root: HTMLElement | undefined;
     let measured = 0;
     let dir: Direction = settings.dir ?? "ltr";
+    /** the root's on-screen size over its layout size, per axis: a CSS-scaled parent's (K5) */
+    let scale = { x: settings.scale ?? 1, y: settings.scale ?? 1 };
     let session: Session | undefined;
     let press: Press | undefined;
     /** a native drag over the root: how deep it is in the root's elements, and the app's answer */
@@ -458,6 +496,25 @@ export function createGridLayoutEngine(
 
     // ─── pixels and direction ───────────────────────────────────────────────────────────────
 
+    /**
+     * The scale the root is drawn at: the `scale` option, else its box on screen over its layout
+     * size (`transform: scale()` on an ancestor), read at a gesture's start and on measure.
+     */
+    function readScale(): void {
+        if (settings.scale !== undefined || !root) {
+            const fixed = settings.scale ?? 1;
+            scale = { x: fixed, y: fixed };
+            return;
+        }
+        const box = root.getBoundingClientRect();
+        const of = (shown: number, laid: number) =>
+            shown > 0 && laid > 0 ? shown / laid : 1;
+        scale = {
+            x: of(box.width, root.offsetWidth),
+            y: of(box.height, root.offsetHeight),
+        };
+    }
+
     function readDirection(): void {
         if (settings.dir) {
             dir = settings.dir;
@@ -478,9 +535,10 @@ export function createGridLayoutEngine(
         box: DOMRect | undefined = root?.getBoundingClientRect(),
     ): { x: number; y: number } {
         if (!root || !box) return { x: 0, y: 0 };
-        // items are placed from the padding box: inside the border
-        const left = clientX - box.left - root.clientLeft;
-        const top = clientY - box.top - root.clientTop + root.scrollTop;
+        // items are placed from the padding box (inside the border), in the root's own pixels
+        const left = (clientX - box.left) / scale.x - root.clientLeft;
+        const top =
+            (clientY - box.top) / scale.y - root.clientTop + root.scrollTop;
         const width = view.width;
         return { x: dir === "rtl" ? width - left : left, y: top };
     }
@@ -495,7 +553,12 @@ export function createGridLayoutEngine(
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2 - (root?.scrollTop ?? 0);
         const below = settings.autoSize ? rect.height : 0;
-        return x < 0 || x > box.width || y < 0 || y > box.height + below;
+        return (
+            x < 0 ||
+            x > box.width / scale.x ||
+            y < 0 ||
+            y > box.height / scale.y + below
+        );
     }
 
     /** The structural style of an item at `rect`, physical: what parts and gestures both write. */
@@ -545,6 +608,19 @@ export function createGridLayoutEngine(
     }
 
     // ─── previews ───────────────────────────────────────────────────────────────────────────
+
+    /** The height the root shows: the layout's with `autoSize`, its own otherwise. */
+    const shownHeight = () =>
+        settings.autoSize ? view.height : (root?.clientHeight ?? 0);
+
+    /**
+     * The pixels pixel constraints read in `current` (K2): the geometry, and the height the root
+     * showed when it started (a preview that grows the grid moves no bound). Passed to each dry
+     * run and to the command, never stored in the model.
+     */
+    function envOf(current: Session): ConstraintEnv {
+        return { geometry: geometryOf(), height: current.height };
+    }
 
     /** The command a gesture ending at `target` runs, or none when it changes nothing. */
     function commandFor(current: Session, target: GridRect) {
@@ -597,6 +673,7 @@ export function createGridLayoutEngine(
         layout: current.start,
         landed: current.before,
         refused: false,
+        asked: rectOf(current.before),
     });
 
     /**
@@ -607,29 +684,44 @@ export function createGridLayoutEngine(
     function previewFor(current: Session, target: GridRect): Preview {
         const call = commandFor(current, target);
         if (!call) return still(current);
-        const result = model.check(call.command, call.payload as never);
+        const result = model.check(call.command, call.payload as never, {
+            env: envOf(current),
+        });
         if (!result.ok) {
             // a refused drop is where it is, shown refused; a refused move goes back
             const landed =
                 current.kind === "drop"
                     ? { ...current.before, ...target }
                     : current.before;
-            return { layout: current.start, landed, refused: true };
+            return {
+                layout: current.start,
+                landed,
+                refused: true,
+                asked: target,
+            };
         }
         const value = result.value as {
             readonly item: LayoutItem;
             readonly layout: Layout;
         };
-        return { layout: value.layout, landed: value.item, refused: false };
+        return {
+            layout: value.layout,
+            landed: value.item,
+            refused: false,
+            asked: target,
+        };
     }
 
     /** Shows `next`: a new view only when what it shows changed. */
     function show(current: Session, next: Preview, outside: boolean): void {
         const geometry = geometryOf();
+        // the command asks for what this preview was asked for (the same places either way)
+        current.asked = next.asked;
+        // a dry run gives new objects: the same places show nothing new (no render)
         if (
             !geometry ||
-            (next.layout === current.preview &&
-                next.landed === current.landed &&
+            (samePlaces(next.layout, current.preview) &&
+                sameRect(next.landed, current.landed) &&
                 next.refused === current.refused &&
                 outside === current.outside)
         ) {
@@ -682,6 +774,7 @@ export function createGridLayoutEngine(
         const geometry = geometryOf();
         if (!geometry) return undefined;
         readDirection();
+        readScale();
         focusNext = undefined;
         const startRect = itemPixels(geometry, before);
         const start = model.get("layout");
@@ -698,6 +791,8 @@ export function createGridLayoutEngine(
             before,
             startRect,
             target: rectOf(before),
+            asked: rectOf(before),
+            height: shownHeight(),
             preview: start,
             landed: before,
             refused: false,
@@ -767,12 +862,14 @@ export function createGridLayoutEngine(
             land(current, nativeEvent);
             return;
         }
-        const call = commandFor(current, current.target);
+        const call = commandFor(current, current.asked);
         // the command first, then the session ends: the item goes straight to where it landed
         if (call && current.preview !== current.start) {
             committing = true;
             try {
-                model.run(call.command, call.payload as never);
+                model.run(call.command, call.payload as never, {
+                    env: envOf(current),
+                });
             } finally {
                 committing = false;
             }
@@ -807,12 +904,13 @@ export function createGridLayoutEngine(
     function land(current: Session, nativeEvent: Event | undefined): void {
         let result: ReturnType<typeof model.run<"item.add">> | undefined;
         if (!current.outside && !current.refused) {
-            const call = commandFor(current, current.target);
+            const call = commandFor(current, current.asked);
             committing = true;
             try {
                 result = model.run(
                     "item.add",
                     call?.payload as { item: LayoutItem },
+                    { env: envOf(current) },
                 );
             } finally {
                 committing = false;
@@ -880,25 +978,21 @@ export function createGridLayoutEngine(
         };
     }
 
-    /** The cell an item of `w` × `h` drawn at `left`/`top` lands in, inside the grid. */
+    /**
+     * The cell an item of `w` × `h` drawn at `left`/`top` asks for, inside the columns: the
+     * model's constraints decide where it lands (`maxRows` is `gridBounds`').
+     */
     function cellFor(
         geometry: GridGeometry,
         left: number,
         top: number,
         size: { readonly w: number; readonly h: number },
     ): GridRect {
-        const rules = rulesOf(model.state);
         const cell = cellAt(geometry, left, top);
         const { w, h } = size;
         return {
-            x: Math.max(0, Math.min(cell.x, rules.cols - w)),
-            y: Math.max(
-                0,
-                Math.min(
-                    cell.y,
-                    (rules.maxRows ?? Number.POSITIVE_INFINITY) - h,
-                ),
-            ),
+            x: Math.max(0, Math.min(cell.x, model.state.cols - w)),
+            y: Math.max(0, cell.y),
             w,
             h,
         };
@@ -921,12 +1015,13 @@ export function createGridLayoutEngine(
             // the new item centred under the pointer, moved by the source's offset (on screen)
             pointerAt = { x: event.clientX, y: event.clientY };
             for (const element of dragPreviews) placePreview(element);
+            // the offset is on screen: in the root's pixels, it is divided by the scale
             const offset = current.drop?.dragOffset;
-            const dx = (offset?.x ?? 0) * (dir === "rtl" ? -1 : 1);
+            const dx = ((offset?.x ?? 0) / scale.x) * (dir === "rtl" ? -1 : 1);
             const at = {
                 ...start,
                 left: point.x - start.width / 2 + dx,
-                top: point.y - start.height / 2 + (offset?.y ?? 0),
+                top: point.y - start.height / 2 + (offset?.y ?? 0) / scale.y,
             };
             const { left, top } = bound(at.left, at.top, start);
             target = cellFor(geometry, left, top, current.before);
@@ -966,12 +1061,13 @@ export function createGridLayoutEngine(
                     height: Math.max(height, 0),
                 });
             }
-            const units = unitsAt(geometry, width, height);
+            // the size asked, inside the columns: the constraints (by default the item's limits
+            // and the grid's bounds) are the model's
             target = resizeRect(
-                current.before,
+                { id: current.itemId, ...rectOf(current.before) },
                 current.side ?? "bottom-end",
-                units,
-                rulesOf(model.state),
+                unitsAt(geometry, width, height),
+                { cols: model.state.cols },
             );
         }
         retarget(current, target, outside);
@@ -1055,9 +1151,15 @@ export function createGridLayoutEngine(
      * grows a row at a time).
      */
     function reachBelow(current: Session): number {
-        if (current.kind !== "resize") return current.startRect.height / 2;
         const geometry = geometryOf();
-        return geometry ? geometry.rowHeight + geometry.gap[1] : 0;
+        const reach =
+            current.kind !== "resize"
+                ? current.startRect.height / 2
+                : geometry
+                  ? geometry.rowHeight + geometry.gap[1]
+                  : 0;
+        // in the root's pixels: on screen, times its scale
+        return reach * scale.y;
     }
 
     /**
@@ -1449,12 +1551,13 @@ export function createGridLayoutEngine(
         cell: { readonly x: number; readonly y: number },
     ): LayoutItem {
         const item = dropItemOf(drop.item);
+        // inside the columns: its limits are the model's constraints, on the drop
         return {
             ...item,
             id: drop.itemId ?? newId(),
             x: cell.x,
             y: cell.y,
-            ...fitSize(item, model.state.cols),
+            w: Math.min(item.w, model.state.cols),
         };
     }
 
@@ -1703,6 +1806,66 @@ export function createGridLayoutEngine(
         );
     }
 
+    /**
+     * Where one arrow takes the held item: one cell (or one size step) further, inside the
+     * columns, and further again while the item's constraints bring that back to where it is (a
+     * `snapToGrid` step), so a key always moves it when its rules allow.
+     */
+    function keyStep(
+        current: Session,
+        dx: number,
+        dy: number,
+        size: boolean,
+    ): GridRect {
+        const rules = rulesOf(model.state);
+        const { target } = current;
+        const layout = current.preview;
+        const env = envOf(current);
+        const held = { ...current.before, ...target };
+        // as far as an ask can go: the columns, and the rows the layout reaches with room to spare
+        const steps = Math.max(rules.cols, bottom(layout) + target.h) + 1;
+        const ask = (n: number): GridRect =>
+            size
+                ? {
+                      ...target,
+                      w: Math.max(
+                          1,
+                          Math.min(target.w + dx * n, rules.cols - target.x),
+                      ),
+                      h: Math.max(1, target.h + dy * n),
+                  }
+                : {
+                      ...target,
+                      x: Math.max(
+                          0,
+                          Math.min(target.x + dx * n, rules.cols - target.w),
+                      ),
+                      y: Math.max(0, target.y + dy * n),
+                  };
+        const where = (rect: GridRect): GridRect =>
+            size
+                ? constrainResize(held, "bottom-end", rect, rules, layout, env)
+                : {
+                      ...rect,
+                      ...constrainMove(
+                          held,
+                          rect.x,
+                          rect.y,
+                          rules,
+                          layout,
+                          env,
+                      ),
+                  };
+        const here = where(target);
+        for (let n = 1; n <= steps; n++) {
+            const next = ask(n);
+            // at the edge: no further to go
+            if (sameRect(next, ask(n - 1))) return next;
+            if (!sameRect(where(next), here)) return next;
+        }
+        return ask(1);
+    }
+
     function keyboardStep(current: Session, event: KeyboardEvent): void {
         if (event.key === "Escape") {
             event.preventDefault();
@@ -1723,30 +1886,11 @@ export function createGridLayoutEngine(
         const arrow = ARROWS[event.key];
         if (!arrow || event.altKey || event.ctrlKey || event.metaKey) return;
         event.preventDefault();
-        const rules = rulesOf(model.state);
         // arrows are visual: in right-to-left, ArrowRight goes toward the inline start
         const dx = dir === "rtl" ? -arrow[0] : arrow[0];
         const dy = arrow[1];
-        const { target, before } = current;
-        let next: GridRect;
-        if (event.shiftKey) {
-            if (!may(current, "size")) return;
-            const sized = resizeRect(
-                { ...before, x: target.x, y: target.y },
-                "bottom-end",
-                { w: target.w + dx, h: target.h + dy },
-                rules,
-            );
-            next = { ...target, w: sized.w, h: sized.h };
-        } else {
-            if (!may(current, "move")) return;
-            const maxRows = rules.maxRows ?? Number.POSITIVE_INFINITY;
-            next = {
-                ...target,
-                x: Math.max(0, Math.min(target.x + dx, rules.cols - target.w)),
-                y: Math.max(0, Math.min(target.y + dy, maxRows - target.h)),
-            };
-        }
+        if (!may(current, event.shiftKey ? "size" : "move")) return;
+        const next = keyStep(current, dx, dy, event.shiftKey);
         // a step the model would refuse (a middleware, a collision) is not taken, unless the item
         // is refused where it is already (a drop that entered where the rules say no): it steps out
         const outcome = previewFor(current, next);
@@ -1815,6 +1959,10 @@ export function createGridLayoutEngine(
                 },
                 geometry: () => geometryOf(),
                 dir: () => dir,
+                cells: ({ rows }) =>
+                    view.geometry
+                        ? gridCells(view.geometry, cellRowCount(view, rows))
+                        : [],
             };
             const query = queries[key] as (
                 payload: unknown,
@@ -1879,6 +2027,7 @@ export function createGridLayoutEngine(
                 );
                 measured = Math.round(element.clientWidth);
                 readDirection();
+                readScale();
                 resolveBreakpoint();
                 update();
                 const host = element.ownerDocument.defaultView;
@@ -1893,6 +2042,7 @@ export function createGridLayoutEngine(
                               if (root !== element) return;
                               measured = Math.round(element.clientWidth);
                               readDirection();
+                              readScale();
                               resolveBreakpoint();
                               update();
                           });
@@ -1958,6 +2108,7 @@ export function createGridLayoutEngine(
                 const before = settings;
                 settings = settingsOf(next);
                 if (settings.dir !== before.dir) readDirection();
+                if (settings.scale !== before.scale) readScale();
                 // released, the width decides again; a new one (or a new width) applies
                 if (
                     before.breakpoint !== undefined &&

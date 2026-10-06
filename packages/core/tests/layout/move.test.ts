@@ -352,3 +352,19 @@ describe("moveItem", () => {
         expect(boxes(result)).toEqual({ A: [1, 0, 1, 1], B: [0, 0, 1, 1] });
     });
 });
+
+describe("a move toward the start onto a neighbour", () => {
+    it("react-grid-layout#2252 swaps the two under horizontal compaction", () => {
+        const moved = moveItem(
+            frozen([
+                { id: "a", x: 0, y: 0, w: 1, h: 1 },
+                { id: "b", x: 1, y: 0, w: 1, h: 1 },
+            ]),
+            "b",
+            0,
+            0,
+            { cols: 12, compactor: horizontalCompactor },
+        );
+        expect(boxes(moved)).toEqual({ a: [1, 0, 1, 1], b: [0, 0, 1, 1] });
+    });
+});

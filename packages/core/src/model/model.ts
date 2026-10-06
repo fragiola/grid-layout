@@ -6,15 +6,23 @@
 import { bottom as bottomOf, collides, collisions } from "../layout/collision";
 import { verticalCompactor } from "../layout/compact";
 import {
+    type ConstraintEnv,
+    constrainMove,
+    constrainPlace,
+    constrainResize,
+    constraintsProblem,
+    defaultConstraints,
+    itemConstraintsProblem,
+    skippedConstraints,
+} from "../layout/constraints";
+import {
     addItem,
     moveItem,
     placeItem,
     removeItem,
     resizeItem,
 } from "../layout/edit";
-import { fitSize } from "../layout/limits";
 import { layoutProblems, normaliseLayout } from "../layout/normalise";
-import { resizeRect } from "../layout/resize";
 import {
     type Breakpoints,
     breakpointFor,
@@ -43,6 +51,7 @@ import {
     type GridSettings,
     type ItemSettings,
     type Middleware,
+    type PlaceResult,
     type QueryKey,
     type QueryMap,
     type QuestionKey,
@@ -95,6 +104,8 @@ export function rulesOf(state: GridLayoutState): LayoutRules {
         compactor: state.compactor,
         preventCollision: state.preventCollision,
         allowOverlap: state.allowOverlap,
+        constraints: state.constraints,
+        constraintRegistry: state.constraintRegistry,
     };
 }
 
@@ -115,6 +126,15 @@ function done<R>(state: GridLayoutState, value: R): Applied<R> {
     return { ok: true, value: { state, value } };
 }
 
+/** Throws a {@link PayloadError} when an item names a constraint that cannot apply. */
+function checkItemConstraints(layout: Layout, rules: LayoutRules): void {
+    for (const item of layout) {
+        if (!item.constraints) continue;
+        const problem = itemConstraintsProblem(item, rules.constraintRegistry);
+        need(problem === undefined, `item "${item.id}": ${problem ?? ""}`);
+    }
+}
+
 function normalised(layout: Layout, rules: LayoutRules): Layout {
     const result = normaliseLayout(layout, rules);
     if (!result.ok) {
@@ -128,6 +148,7 @@ function normalised(layout: Layout, rules: LayoutRules): Layout {
                 .join("; "),
         );
     }
+    checkItemConstraints(result.layout, rules);
     return result.layout;
 }
 
@@ -218,6 +239,7 @@ const ITEM_SETTINGS = [
     "static",
     "draggable",
     "resizable",
+    "constraints",
 ] as const satisfies readonly (keyof ItemSettings)[];
 
 /** Throws a {@link PayloadError} when `breakpoints` is not a map of minimum widths. */
@@ -292,6 +314,13 @@ function keptColumns(
     );
 }
 
+/** Whether two lists hold the same values in the same order. */
+function sameList<T>(a: readonly T[], b: readonly T[]): boolean {
+    return (
+        a.length === b.length && a.every((value, index) => value === b[index])
+    );
+}
+
 /** Whether two maps hold the same values under the same keys. */
 function sameMap<T>(
     a: Readonly<Record<string, T>>,
@@ -310,7 +339,12 @@ function checkGridSettings(settings: GridSettings): void {
         typeof settings === "object" && settings !== null,
         "settings must be an object",
     );
-    const { maxRows, compactor, preventCollision, allowOverlap } = settings;
+    const { maxRows, compactor, preventCollision, allowOverlap, constraints } =
+        settings;
+    if (constraints !== undefined) {
+        const problem = constraintsProblem(constraints);
+        need(problem === undefined, problem ?? "");
+    }
     need(
         isLimit(maxRows),
         "maxRows must be an integer of at least 1, or Infinity",
@@ -354,10 +388,33 @@ function settledLayouts(
     return Object.freeze(Object.fromEntries(entries));
 }
 
+/** Under `preventCollision` (and without `allowOverlap`), the item `box` would land on. */
+function collision(
+    state: GridLayoutState,
+    layout: Layout,
+    box: LayoutItem,
+): LayoutItem | undefined {
+    if (!state.preventCollision || state.allowOverlap) return undefined;
+    return layout.find((other) => collides(other, box));
+}
+
+/** A placing command's value: the item, the layout, and the pixel constraints it skipped. */
+function placed(
+    item: LayoutItem,
+    layout: Layout,
+    rules: LayoutRules,
+    env: ConstraintEnv,
+    kind: "position" | "size" | "both",
+): PlaceResult {
+    const skipped = skippedConstraints(rules, item, env, kind);
+    return skipped.length > 0 ? { item, layout, skipped } : { item, layout };
+}
+
 type Handlers = {
     [C in CommandName]: (
         state: GridLayoutState,
         payload: CommandMap[C]["payload"],
+        env: ConstraintEnv,
     ) => Applied<CommandMap[C]["result"]>;
 };
 
@@ -369,7 +426,7 @@ const handlers: Handlers = {
         return done(withLayoutAt(state, name, next), { layout: next });
     },
 
-    "item.add": (state, { item, breakpoint }) => {
+    "item.add": (state, { item, breakpoint }, env) => {
         need(
             typeof item === "object" && item !== null,
             "item must be an object",
@@ -385,12 +442,12 @@ const handlers: Handlers = {
             { ...item, x: item.x ?? 0, y: item.y ?? 0 },
         ]);
         need(problems.length === 0, problems.map((p) => p.message).join("; "));
-        // the size within the item's own limits and the columns
-        const { w, h } = fitSize(item, rules.cols);
+        checkItemConstraints([item as LayoutItem], rules);
         // `y: Infinity` means below everything, as in a layout
-        const y =
-            item.y === Number.POSITIVE_INFINITY ? bottomOf(layout) : item.y;
-        const next = addItem(layout, { ...item, y, w, h }, rules);
+        const below = (of: Layout) =>
+            item.y === Number.POSITIVE_INFINITY ? { y: bottomOf(of) } : {};
+        const next = addItem(layout, { ...item, ...below(layout) }, rules, env);
+        const added = itemIn(next, item.id);
         return done(
             alsoActive(
                 withLayoutAt(state, target.breakpoint, next),
@@ -400,18 +457,12 @@ const handlers: Handlers = {
                         ? active
                         : addItem(
                               active,
-                              {
-                                  ...item,
-                                  y:
-                                      item.y === Number.POSITIVE_INFINITY
-                                          ? bottomOf(active)
-                                          : item.y,
-                                  ...fitSize(item, activeRules.cols),
-                              },
+                              { ...item, ...below(active) },
                               activeRules,
+                              env,
                           ),
             ),
-            { item: itemIn(next, item.id), layout: next },
+            placed(added, next, rules, env, "both"),
         );
     },
 
@@ -432,7 +483,7 @@ const handlers: Handlers = {
         );
     },
 
-    "item.move": (state, { itemId, x, y, breakpoint }) => {
+    "item.move": (state, { itemId, x, y, breakpoint }, env) => {
         need(isInteger(x) && isInteger(y), "x and y must be integers");
         const target = targetOf(state, breakpoint);
         if (isFailure(target)) return target;
@@ -441,32 +492,28 @@ const handlers: Handlers = {
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
         need(
-            x >= 0 &&
-                y >= 0 &&
-                x + item.w <= rules.cols &&
-                y + item.h <= state.maxRows,
+            x >= 0 && y >= 0 && x + item.w <= rules.cols,
             `the cell ${x},${y} puts item "${item.id}" outside the grid`,
         );
-        if (state.preventCollision && !state.allowOverlap) {
-            const moved = { ...item, x, y };
-            const hit = layout.find((other) => collides(other, moved));
-            if (hit) {
-                return fail(
-                    "collision",
-                    `item "${item.id}" would land on "${hit.id}"`,
-                );
-            }
+        const to = constrainMove(item, x, y, rules, layout, env);
+        const hit = collision(state, layout, { ...item, ...to });
+        if (hit) {
+            return fail(
+                "collision",
+                `item "${item.id}" would land on "${hit.id}"`,
+            );
         }
-        const next = moveItem(layout, item.id, x, y, rules);
-        return done(withLayoutAt(state, target.breakpoint, next), {
-            item: itemIn(next, item.id),
-            layout: next,
-        });
+        const next = moveItem(layout, item.id, x, y, rules, env);
+        return done(
+            withLayoutAt(state, target.breakpoint, next),
+            placed(itemIn(next, item.id), next, rules, env, "position"),
+        );
     },
 
     "item.resize": (
         state,
         { itemId, w, h, side = "bottom-end", breakpoint },
+        env,
     ) => {
         need(isInteger(w) && isInteger(h), "w and h must be integers");
         need(
@@ -479,25 +526,22 @@ const handlers: Handlers = {
         const item = found(layout, itemId);
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
-        if (state.preventCollision && !state.allowOverlap) {
-            const rect = resizeRect(item, side, { w, h }, rules);
-            const sized = { ...item, ...rect };
-            const hit = layout.find((other) => collides(other, sized));
-            if (hit) {
-                return fail(
-                    "collision",
-                    `item "${item.id}" would grow into "${hit.id}"`,
-                );
-            }
+        const rect = constrainResize(item, side, { w, h }, rules, layout, env);
+        const hit = collision(state, layout, { ...item, ...rect });
+        if (hit) {
+            return fail(
+                "collision",
+                `item "${item.id}" would grow into "${hit.id}"`,
+            );
         }
-        const next = resizeItem(layout, item.id, { w, h }, side, rules);
-        return done(withLayoutAt(state, target.breakpoint, next), {
-            item: itemIn(next, item.id),
-            layout: next,
-        });
+        const next = resizeItem(layout, item.id, { w, h }, side, rules, env);
+        return done(
+            withLayoutAt(state, target.breakpoint, next),
+            placed(itemIn(next, item.id), next, rules, env, "size"),
+        );
     },
 
-    "item.place": (state, { itemId, x, y, w, h, breakpoint }) => {
+    "item.place": (state, { itemId, x, y, w, h, breakpoint }, env) => {
         need(
             [x, y, w, h].every(isInteger) && w >= 1 && h >= 1,
             "x and y must be integers, w and h integers of at least 1",
@@ -509,24 +553,22 @@ const handlers: Handlers = {
         if (isFailure(item)) return item;
         if (item.static) return fail("refused", `item "${item.id}" is static`);
         need(
-            x >= 0 && y >= 0 && x + w <= rules.cols && y + h <= state.maxRows,
+            x >= 0 && y >= 0 && x + w <= rules.cols,
             `the box ${x},${y} ${w}×${h} puts item "${item.id}" outside the grid`,
         );
-        if (state.preventCollision && !state.allowOverlap) {
-            const box = { id: item.id, x, y, w, h };
-            const hit = layout.find((other) => collides(other, box));
-            if (hit) {
-                return fail(
-                    "collision",
-                    `item "${item.id}" would land on "${hit.id}"`,
-                );
-            }
+        const box = constrainPlace(item, { x, y, w, h }, rules, layout, env);
+        const hit = collision(state, layout, { ...item, ...box });
+        if (hit) {
+            return fail(
+                "collision",
+                `item "${item.id}" would land on "${hit.id}"`,
+            );
         }
-        const next = placeItem(layout, item.id, { x, y, w, h }, rules);
-        return done(withLayoutAt(state, target.breakpoint, next), {
-            item: itemIn(next, item.id),
-            layout: next,
-        });
+        const next = placeItem(layout, item.id, { x, y, w, h }, rules, env);
+        return done(
+            withLayoutAt(state, target.breakpoint, next),
+            placed(itemIn(next, item.id), next, rules, env, "both"),
+        );
     },
 
     "item.configure": (state, { itemId, settings, breakpoint }) => {
@@ -578,6 +620,7 @@ const handlers: Handlers = {
     "grid.configure": (state, { settings }) => {
         checkGridSettings(settings);
         const { maxRows, compactor, preventCollision, allowOverlap } = settings;
+        const constraints = settings.constraints ?? state.constraints;
         const breakpoints =
             settings.breakpoints === undefined
                 ? state.breakpoints
@@ -606,6 +649,9 @@ const handlers: Handlers = {
             compactor: compactor ?? state.compactor,
             preventCollision: preventCollision ?? state.preventCollision,
             allowOverlap: allowOverlap ?? state.allowOverlap,
+            constraints: sameList(constraints, state.constraints)
+                ? state.constraints
+                : Object.freeze([...constraints]),
         };
         // a breakpoint gone takes its layout; the others settle in their columns
         const normalisedLayouts = Object.entries(state.layouts)
@@ -649,6 +695,7 @@ const handlers: Handlers = {
             configured.compactor === state.compactor &&
             configured.preventCollision === state.preventCollision &&
             configured.allowOverlap === state.allowOverlap &&
+            configured.constraints === state.constraints &&
             layouts === state.layouts;
         return done(same ? state : Object.freeze({ ...configured, layouts }), {
             rules: rulesOf(configured),
@@ -773,6 +820,10 @@ export function createGridLayoutModel(
         compactor: options.compactor ?? verticalCompactor,
         preventCollision: options.preventCollision === true,
         allowOverlap: options.allowOverlap === true,
+        constraints: Object.freeze([
+            ...(options.constraints ?? defaultConstraints),
+        ]),
+        constraintRegistry: Object.freeze({ ...options.constraintRegistry }),
         breakpoint,
         layouts: {},
     };
@@ -795,6 +846,13 @@ export function createGridLayoutModel(
                 `invalid layout: ${result.problems.map((problem) => problem.message).join("; ")}`,
             );
         }
+        try {
+            checkItemConstraints(result.layout, rulesAt(blank, name));
+        } catch (error) {
+            throw new TypeError(
+                `invalid layout: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
         settled[name] = result.layout;
     }
     let layouts: Readonly<Record<string, Layout>> = Object.freeze(settled);
@@ -814,13 +872,20 @@ export function createGridLayoutModel(
     let state: GridLayoutState = Object.freeze({ ...blank, layouts });
     const middlewares: Middleware[] = [];
     const listeners = new Set<CommandListener>();
-    const queue: { command: CommandName; payload: unknown }[] = [];
+    const queue: {
+        command: CommandName;
+        payload: unknown;
+        env: ConstraintEnv;
+    }[] = [];
+    /** a run without the engine's pixels */
+    const noEnv: ConstraintEnv = Object.freeze({});
     let running = false;
 
     /** The chain, then the handler; returns the new state (uncommitted), value and payload. */
     function execute(
         command: CommandName,
         payload: unknown,
+        env: ConstraintEnv,
         dryRun: boolean,
     ): CommandResult<{
         state: GridLayoutState;
@@ -836,6 +901,7 @@ export function createGridLayoutModel(
             payload: payload ?? {},
             dryRun,
             state,
+            env,
         } as CommandContext;
         let applied: Applied<unknown> | undefined;
         const step = (index: number): CommandResult<unknown> => {
@@ -844,9 +910,10 @@ export function createGridLayoutModel(
                 const handler = handlers[ctx.command] as (
                     state: GridLayoutState,
                     payload: unknown,
+                    env: ConstraintEnv,
                 ) => Applied<unknown>;
                 try {
-                    applied = handler(state, ctx.payload);
+                    applied = handler(state, ctx.payload, env);
                 } catch (error) {
                     // a payload of the wrong shape: a command never throws on bad input
                     applied = fail(
@@ -900,9 +967,10 @@ export function createGridLayoutModel(
     function commit(
         command: CommandName,
         payload: unknown,
+        env: ConstraintEnv,
     ): CommandResult<unknown> {
         if (running) {
-            queue.push({ command, payload });
+            queue.push({ command, payload, env });
             return fail(
                 "queued",
                 "issued while another command ran: it runs right after",
@@ -913,7 +981,7 @@ export function createGridLayoutModel(
         running = true;
         let outcome: ReturnType<typeof execute>;
         try {
-            outcome = execute(command, payload, false);
+            outcome = execute(command, payload, env, false);
             if (outcome.ok && outcome.value.state !== state) {
                 const before = state;
                 state = outcome.value.state;
@@ -946,6 +1014,7 @@ export function createGridLayoutModel(
                             breakpoint: active,
                             from: switched ? before.breakpoint : undefined,
                         },
+                        env: noEnv,
                     });
                 }
             }
@@ -953,7 +1022,7 @@ export function createGridLayoutModel(
             running = false;
             // what was queued runs even when a listener threw
             const pending = queue.shift();
-            if (pending) commit(pending.command, pending.payload);
+            if (pending) commit(pending.command, pending.payload, pending.env);
         }
         return outcome.ok ? { ok: true, value: outcome.value.value } : outcome;
     }
@@ -961,8 +1030,9 @@ export function createGridLayoutModel(
     function dryRun(
         command: CommandName,
         payload: unknown,
+        env: ConstraintEnv,
     ): CommandResult<unknown> {
-        const outcome = execute(command, payload, true);
+        const outcome = execute(command, payload, env, true);
         return outcome.ok ? { ok: true, value: outcome.value.value } : outcome;
     }
 
@@ -1018,14 +1088,22 @@ export function createGridLayoutModel(
         get state() {
             return state;
         },
-        run(command, ...[payload]) {
-            return commit(command, payload) as CommandResult<never>;
+        run(command, ...[payload, options]) {
+            return commit(
+                command,
+                payload,
+                options?.env ?? noEnv,
+            ) as CommandResult<never>;
         },
-        can(command, ...[payload]) {
-            return dryRun(command, payload).ok;
+        can(command, ...[payload, options]) {
+            return dryRun(command, payload, options?.env ?? noEnv).ok;
         },
-        check(command, ...[payload]) {
-            return dryRun(command, payload) as CommandResult<never>;
+        check(command, ...[payload, options]) {
+            return dryRun(
+                command,
+                payload,
+                options?.env ?? noEnv,
+            ) as CommandResult<never>;
         },
         get(key, ...[payload]) {
             const query = queries[key] as (

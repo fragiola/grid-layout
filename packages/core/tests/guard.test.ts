@@ -37,8 +37,24 @@ const IMPORT_REACT =
  * here starts with a line comment naming the project, its copyright and the MIT licence, and the
  * root LICENSE carries that project's notice.
  */
-const DERIVED: { file: string; from: keyof typeof NOTICES }[] = [
+const DERIVED: {
+    file: string;
+    from: keyof typeof NOTICES;
+    /** who else the header credits: the authors of the upstream pull requests it builds on */
+    credits?: readonly string[];
+}[] = [
+    {
+        file: "src/compactors/fast.ts",
+        from: "react-grid-layout",
+        credits: ["PR #2152 by Morris Brodersen"],
+    },
+    {
+        file: "src/compactors/wrap.ts",
+        from: "react-grid-layout",
+        credits: ["PR #1773 by John Thomson"],
+    },
     { file: "src/layout/compact.ts", from: "react-grid-layout" },
+    { file: "src/layout/constraints.ts", from: "react-grid-layout" },
     { file: "src/layout/geometry.ts", from: "react-grid-layout" },
     { file: "src/layout/move.ts", from: "react-grid-layout" },
     { file: "src/layout/normalise.ts", from: "react-grid-layout" },
@@ -116,14 +132,15 @@ describe("core package guard", () => {
     });
 
     it("every derived file names its source project, copyright and the MIT licence", () => {
-        const missing = DERIVED.filter(({ file, from }) => {
+        const missing = DERIVED.filter(({ file, from, credits = [] }) => {
             const path = join(root, file);
             if (!existsSync(path)) return true;
             const head = header(path);
             return !(
                 head.includes(from) &&
                 head.includes("MIT") &&
-                NOTICES[from].every((line) => head.includes(line))
+                NOTICES[from].every((line) => head.includes(line)) &&
+                credits.every((credit) => head.includes(credit))
             );
         });
         expect(missing).toEqual([]);

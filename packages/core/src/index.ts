@@ -9,12 +9,16 @@ export {
 } from "./engine/dom";
 export { createGridLayoutEngine } from "./engine/engine";
 export {
+    type CellState,
+    cellPart,
+    cellRowCount,
     type DragHandleState,
     type DragPreviewState,
     type DragSourceState,
     dragHandlePart,
     dragPreviewPart,
     dragSourcePart,
+    gridCells,
     type ItemState,
     itemPart,
     type Part,
@@ -27,6 +31,7 @@ export {
     type StructuralStyle,
 } from "./engine/parts";
 export type {
+    CellRows,
     Direction,
     DropItem,
     EngineActionMap,
@@ -38,6 +43,7 @@ export type {
     GestureListener,
     GestureSource,
     GestureView,
+    GridCell,
     GridLayoutEngine,
     GridLayoutEngineAdapter,
     GridLayoutEngineOptions,
@@ -56,6 +62,25 @@ export {
     noCompactor,
     verticalCompactor,
 } from "./layout/compact";
+export {
+    aspectRatio,
+    boundedX,
+    boundedY,
+    type ConstraintArg,
+    type ConstraintContext,
+    type ConstraintEnv,
+    type ConstraintFactory,
+    type ConstraintRegistry,
+    containerBounds,
+    defaultConstraints,
+    gridBounds,
+    type ItemConstraint,
+    type LayoutConstraint,
+    maxSize,
+    minMaxSize,
+    minSize,
+    snapToGrid,
+} from "./layout/constraints";
 export {
     addItem,
     compactLayout,
@@ -126,11 +151,14 @@ export {
     type ItemSettings,
     type Middleware,
     type PayloadOf,
+    type PlaceResult,
     type QueryKey,
     type QueryMap,
     type QuestionKey,
     type QuestionMap,
     type ResultOf,
+    type RunArgs,
+    type RunOptions,
 } from "./model/types";
 
 /** The package version, until the first release replaces this placeholder export. */
