@@ -288,10 +288,12 @@ export function resolveConstraint(
     if (entry === undefined) return `no constraint "${name}" is registered`;
     if (typeof entry !== "function") return entry;
     const key = typeof constraint === "object" ? constraint : entry;
-    let cache = resolved.get(registry ?? resolved);
+    // a name with an entry: the registry is there
+    const of = registry as ConstraintRegistry;
+    let cache = resolved.get(of);
     if (!cache) {
         cache = new WeakMap();
-        resolved.set(registry ?? resolved, cache);
+        resolved.set(of, cache);
     }
     const known = cache.get(key);
     if (known) return known;
@@ -308,6 +310,53 @@ export function resolveConstraint(
     }
     cache.set(key, made as LayoutConstraint);
     return made as LayoutConstraint;
+}
+
+const isArg = (value: unknown) =>
+    value === null || ["string", "number", "boolean"].includes(typeof value);
+
+/** Why `constraints` cannot be an item's: not a list of names, or of `{ name, args? }` of plain data. */
+export function itemConstraintsShapeProblem(
+    constraints: unknown,
+): string | undefined {
+    if (constraints === undefined) return undefined;
+    const ok =
+        Array.isArray(constraints) &&
+        constraints.every(
+            (one: unknown) =>
+                typeof one === "string" ||
+                (typeof one === "object" &&
+                    one !== null &&
+                    typeof (one as { name?: unknown }).name === "string" &&
+                    ((one as { args?: unknown }).args === undefined ||
+                        (Array.isArray((one as { args?: unknown }).args) &&
+                            (one as { args: unknown[] }).args.every(isArg)))),
+        );
+    return ok
+        ? undefined
+        : "constraints must be a list of names, or of { name, args } with plain arguments";
+}
+
+/** Whether two items' stored constraints say the same: by name and arguments. */
+export function sameItemConstraints(
+    a: readonly ItemConstraint[] | undefined,
+    b: readonly ItemConstraint[] | undefined,
+): boolean {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every((one, index) => {
+        const other = b[index];
+        if (typeof one === "string" || typeof other === "string")
+            return one === other;
+        const args = one.args ?? [];
+        const otherArgs = other?.args ?? [];
+        return (
+            other !== undefined &&
+            one.name === other.name &&
+            args.length === otherArgs.length &&
+            args.every((arg, at) => arg === otherArgs[at])
+        );
+    });
 }
 
 /** Why `constraints` cannot be a grid's: not an array of constraints, or one is invalid. */

@@ -81,10 +81,16 @@ function sweepFast(layout: Layout, cols: number, overlap: boolean): Layout {
     const statics = sorted.filter((item) => item.static);
     // a layout that cannot fit (statics everywhere) ends somewhere instead of looping
     const limit = Math.max(10_000, work.length * 100);
+    // the static furthest toward the end that `item` at `x`/`y` would cover (no allocation)
     const blockedTo = (item: WorkItem, x: number, y: number) => {
         let right: number | undefined;
         for (const fixed of statics) {
-            if (collides({ ...item, id: "", x, y }, fixed)) {
+            if (
+                x < fixed.x + fixed.w &&
+                x + item.w > fixed.x &&
+                y < fixed.y + fixed.h &&
+                y + item.h > fixed.y
+            ) {
                 right = Math.max(right ?? 0, fixed.x + fixed.w);
             }
         }

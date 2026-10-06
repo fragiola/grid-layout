@@ -133,8 +133,11 @@ interface Session {
     target: GridRect;
     /** what the preview shown was asked for: what the gesture's command asks for */
     asked: GridRect;
-    /** the height the root showed when it started: what pixel constraints read throughout */
-    readonly height: number;
+    /**
+     * the pixels pixel constraints read throughout (K2): the geometry and the height the root
+     * showed when it started (a preview that grows the grid moves no bound)
+     */
+    readonly env: ConstraintEnv;
     /** the layout if it ended now, the held item in it, and whether the model refuses it */
     preview: Layout;
     landed: LayoutItem;
@@ -609,18 +612,13 @@ export function createGridLayoutEngine(
 
     // ─── previews ───────────────────────────────────────────────────────────────────────────
 
-    /** The height the root shows: the layout's with `autoSize`, its own otherwise. */
+    /**
+     * The height the root shows: the layout's with `autoSize`, its own otherwise. A gesture keeps
+     * the one it started with, in its `env`, for each dry run and its command; the model never
+     * stores it (K2).
+     */
     const shownHeight = () =>
         settings.autoSize ? view.height : (root?.clientHeight ?? 0);
-
-    /**
-     * The pixels pixel constraints read in `current` (K2): the geometry, and the height the root
-     * showed when it started (a preview that grows the grid moves no bound). Passed to each dry
-     * run and to the command, never stored in the model.
-     */
-    function envOf(current: Session): ConstraintEnv {
-        return { geometry: geometryOf(), height: current.height };
-    }
 
     /** The command a gesture ending at `target` runs, or none when it changes nothing. */
     function commandFor(current: Session, target: GridRect) {
@@ -685,7 +683,7 @@ export function createGridLayoutEngine(
         const call = commandFor(current, target);
         if (!call) return still(current);
         const result = model.check(call.command, call.payload as never, {
-            env: envOf(current),
+            env: current.env,
         });
         if (!result.ok) {
             // a refused drop is where it is, shown refused; a refused move goes back
@@ -792,7 +790,7 @@ export function createGridLayoutEngine(
             startRect,
             target: rectOf(before),
             asked: rectOf(before),
-            height: shownHeight(),
+            env: { geometry, height: shownHeight() },
             preview: start,
             landed: before,
             refused: false,
@@ -868,7 +866,7 @@ export function createGridLayoutEngine(
             committing = true;
             try {
                 model.run(call.command, call.payload as never, {
-                    env: envOf(current),
+                    env: current.env,
                 });
             } finally {
                 committing = false;
@@ -910,7 +908,7 @@ export function createGridLayoutEngine(
                 result = model.run(
                     "item.add",
                     call?.payload as { item: LayoutItem },
-                    { env: envOf(current) },
+                    { env: current.env },
                 );
             } finally {
                 committing = false;
@@ -1820,7 +1818,7 @@ export function createGridLayoutEngine(
         const rules = rulesOf(model.state);
         const { target } = current;
         const layout = current.preview;
-        const env = envOf(current);
+        const env = current.env;
         const held = { ...current.before, ...target };
         // as far as an ask can go: the columns, and the rows the layout reaches with room to spare
         const steps = Math.max(rules.cols, bottom(layout) + target.h) + 1;
@@ -1942,6 +1940,8 @@ export function createGridLayoutEngine(
                 "cell-at": ({ clientX, clientY }) => {
                     const geometry = geometryOf();
                     if (!geometry) return undefined;
+                    // a zoom on an ancestor resizes nothing: the scale is read again (K5)
+                    if (!session) readScale();
                     const point = pointIn(clientX, clientY);
                     // the cell whose box (with the gap after it) holds the point
                     const x = Math.floor(

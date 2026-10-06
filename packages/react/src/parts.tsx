@@ -217,6 +217,7 @@ function ShownPreview(
     });
 }
 
+/** `GridLayout.Cells`' props: how many rows, what each cell holds, and each cell element's own. */
 export type CellsProps = DivPrimitiveProps<CellState> & {
     /** how many rows: a number, or `auto` (default), the layout's bottom plus one */
     rows?: CellRows | undefined;

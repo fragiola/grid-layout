@@ -79,6 +79,7 @@ export {
     maxSize,
     minMaxSize,
     minSize,
+    sameItemConstraints,
     snapToGrid,
 } from "./layout/constraints";
 export {

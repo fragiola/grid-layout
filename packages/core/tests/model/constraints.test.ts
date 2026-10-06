@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { fastVerticalOverlapCompactor } from "../../src/compactors";
 import { noCompactor } from "../../src/layout/compact";
 import {
     aspectRatio,
@@ -71,6 +72,22 @@ describe("grid-level constraints", () => {
         expect(
             model.run("item.resize", { itemId: "a", w: 6, h: 2 }),
         ).toMatchObject({ ok: true, value: { item: { w: 6 } } });
+    });
+
+    it("without minMaxSize, a later grid.configure leaves an item past its limits as it is", () => {
+        const model = createGridLayoutModel({
+            constraints: [gridBounds],
+            compactor: noCompactor,
+            layout: frozen([item("b", 2, 0, 3, 2, { minW: 2, maxW: 4 })]),
+        });
+        model.run("item.resize", { itemId: "b", w: 7, h: 2 });
+        model.run("grid.configure", { settings: { maxRows: 20 } });
+        expect(model.get("item-by", { itemId: "b" })).toMatchObject({ w: 7 });
+        // with minMaxSize back, the limits hold again
+        model.run("grid.configure", {
+            settings: { constraints: defaultConstraints },
+        });
+        expect(model.get("item-by", { itemId: "b" })).toMatchObject({ w: 4 });
     });
 
     it("boundedX lets an item past maxRows, still inside the columns", () => {
@@ -311,5 +328,38 @@ describe("the engine's pixels (K2)", () => {
         expect(
             model.run("item.move", { itemId: "a", x: 0, y: 6 }),
         ).toMatchObject({ ok: true, value: { item: { y: 2 } } });
+    });
+});
+
+describe("what the model refuses", () => {
+    it("an item's constraints that are not names or { name, args } of plain data", () => {
+        const model = createGridLayoutModel();
+        for (const constraints of [
+            "boundedX",
+            [null],
+            [{ name: "x", args: [{}] }],
+            [{ args: [1] }],
+        ]) {
+            expect(
+                model.run("item.add", {
+                    item: { id: "a", w: 1, h: 1, constraints } as never,
+                }),
+            ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
+        }
+    });
+
+    it("a compactor made for overlap on a grid without allowOverlap", () => {
+        expect(() =>
+            createGridLayoutModel({ compactor: fastVerticalOverlapCompactor }),
+        ).toThrow(/needs allowOverlap/);
+        const model = createGridLayoutModel({ allowOverlap: true });
+        expect(
+            model.run("grid.configure", {
+                settings: { compactor: fastVerticalOverlapCompactor },
+            }),
+        ).toMatchObject({ ok: true });
+        expect(
+            model.run("grid.configure", { settings: { allowOverlap: false } }),
+        ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
     });
 });

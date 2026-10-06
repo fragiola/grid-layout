@@ -13,6 +13,7 @@ import {
     constraintsProblem,
     defaultConstraints,
     itemConstraintsProblem,
+    itemConstraintsShapeProblem,
     skippedConstraints,
 } from "../layout/constraints";
 import {
@@ -582,6 +583,8 @@ const handlers: Handlers = {
                 `${key} must be an integer of at least 1`,
             );
         }
+        const shape = itemConstraintsShapeProblem(settings.constraints);
+        need(shape === undefined, shape ?? "");
         for (const key of ["static", "draggable", "resizable"] as const) {
             const value = settings[key];
             need(
@@ -687,6 +690,10 @@ const handlers: Handlers = {
             )
                 ? state.layouts
                 : Object.freeze(Object.fromEntries(normalisedLayouts));
+        need(
+            configured.compactor.overlap !== true || configured.allowOverlap,
+            "a compactor made for overlap needs allowOverlap",
+        );
         const same =
             configured.breakpoint === state.breakpoint &&
             configured.breakpoints === state.breakpoints &&
@@ -801,6 +808,11 @@ export function createGridLayoutModel(
             options.breakpoint === undefined ||
                 Object.hasOwn(breakpoints, options.breakpoint),
             `no breakpoint "${String(options.breakpoint)}"`,
+        );
+        need(
+            options.compactor?.overlap !== true ||
+                options.allowOverlap === true,
+            "a compactor made for overlap needs allowOverlap",
         );
     } catch (error) {
         throw new TypeError(

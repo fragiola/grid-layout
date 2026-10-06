@@ -120,10 +120,9 @@ describe("a grid in a scaled parent", () => {
         });
     });
 
-    it("finds the cell under a point at the measured scale", () => {
+    it("finds the cell under a point at the scale shown now, with no gesture or measure", () => {
         const grid = setup({ layout: layout() });
         scaled(grid, 0.5);
-        grid.resizeTo(1200);
         const [clientX, clientY] = at(7, 2, 0.5);
         expect(grid.engine.get("cell-at", { clientX, clientY })).toEqual({
             x: 7,

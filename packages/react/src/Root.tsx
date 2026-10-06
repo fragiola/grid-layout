@@ -23,6 +23,7 @@ import {
     type PerBreakpoint,
     type RootState,
     rootPart,
+    sameItemConstraints,
     verticalCompactor,
 } from "@fragiola/grid-layout";
 import type * as React from "react";
@@ -177,26 +178,6 @@ const ITEM_KEYS = [
     "constraints",
 ] as const satisfies readonly (keyof LayoutItem)[];
 
-/** Whether two items' stored constraints say the same: by name and arguments. */
-function sameConstraints(
-    a: LayoutItem["constraints"],
-    b: LayoutItem["constraints"],
-): boolean {
-    if (a === b) return true;
-    if (!a || !b || a.length !== b.length) return false;
-    return a.every((one, index) => {
-        const other = b[index];
-        if (typeof one === "string" || typeof other === "string")
-            return one === other;
-        return (
-            other !== undefined &&
-            one.name === other.name &&
-            (one.args ?? []).length === (other.args ?? []).length &&
-            (one.args ?? []).every((arg, at) => arg === other.args?.[at])
-        );
-    });
-}
-
 /** The rules' default breakpoints: one, at every width. */
 const ONE_BREAKPOINT = { [DEFAULT_BREAKPOINT]: 0 };
 
@@ -229,7 +210,7 @@ export function sameLayout(a: Layout, b: Layout): boolean {
                     other !== undefined &&
                     ITEM_KEYS.every((key) =>
                         key === "constraints"
-                            ? sameConstraints(item[key], other[key])
+                            ? sameItemConstraints(item[key], other[key])
                             : item[key] === other[key],
                     )
                 );
