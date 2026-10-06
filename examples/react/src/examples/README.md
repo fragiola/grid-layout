@@ -33,7 +33,8 @@ looking for its feature would search, and `order` is its place inside the catego
 | `responsive` | grids that adapt to their own width: breakpoints, a layout per breakpoint, saving them |
 | `mobile` | grids on a phone: long press to move, page scrolling kept, touch sources |
 | `styling` | how the grid looks when it is not about one feature: transitions, the placeholder, RTL |
-| `apps` | several features together, as an app would put them: a dashboard builder |
+| `model-api` | the model and engine driven by the app: middleware, commands from a form, events, undo, controlled and named layouts |
+| `apps` | several features together, as an app would put them: a dashboard builder, analytics, an ops monitor, a portfolio, a photo collage, a kanban board |
 
 ## Adding an example
 
