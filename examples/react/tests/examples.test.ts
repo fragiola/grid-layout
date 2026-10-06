@@ -21,8 +21,9 @@ import { CATEGORIES } from "../src/examples/meta-types.ts";
 const ALLOWED = [
     /^react$/,
     /^react-dom$/,
-    // the React package re-exports the core: an example never imports @fragiola/grid-layout
-    /^@fragiola\/grid-layout-react$/,
+    // the React package re-exports the core: an example never imports @fragiola/grid-layout;
+    // the opt-in compactors are its `/compactors` entry
+    /^@fragiola\/grid-layout-react(\/compactors)?$/,
     /^lucide-react$/,
     /^#\/components\/(ui|atoms)\/[a-z-]+$/,
     /^#\/lib\/cn$/,

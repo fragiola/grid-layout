@@ -162,3 +162,24 @@ export async function middle(locator: Locator) {
     const box = await boxOf(locator);
     return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
+
+/** Grabs `locator` with Space, presses each key in turn, and drops it with Space. */
+export async function keyGesture(
+    page: Page,
+    locator: Locator,
+    keys: readonly string[],
+) {
+    await locator.focus();
+    await page.keyboard.press("Space");
+    for (const key of keys) await page.keyboard.press(key);
+    await page.keyboard.press("Space");
+    await settled(page);
+}
+
+/** One column plus its gap, in pixels: the root's width over `cols`, the padding equal to `gap`. */
+export async function columnPitch(page: Page, cols = 12, gap = 10) {
+    const root = await boxOf(
+        page.getByTestId("stage").locator('[data-grid-layout-part="root"]'),
+    );
+    return (root.width - gap) / cols;
+}
