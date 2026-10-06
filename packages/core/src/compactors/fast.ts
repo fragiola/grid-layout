@@ -9,13 +9,7 @@
 
 import { collides } from "../layout/collision";
 import type { Compactor, Layout } from "../layout/types";
-import {
-    byColumnThenRow,
-    byRowThenColumn,
-    fromWorking,
-    toWorking,
-    type WorkItem,
-} from "../layout/working";
+import { fromWorking, toWorking, type WorkItem } from "../layout/working";
 
 /** Statics first among items at the same cell, so the scan meets them before what they block. */
 const staticsFirst = (a: WorkItem, b: WorkItem) =>
@@ -25,7 +19,9 @@ const staticsFirst = (a: WorkItem, b: WorkItem) =>
 function riseFast(layout: Layout, cols: number, overlap: boolean): Layout {
     const work = toWorking(layout);
     const sorted = [...work].sort(
-        (a, b) => byRowThenColumn(a, b) || staticsFirst(a, b),
+        // the reading order written out: a sort's comparator stays in this module (a call to
+        // another one costs, here more than anywhere)
+        (a, b) => a.y - b.y || a.x - b.x || staticsFirst(a, b),
     );
     const tide = new Array<number>(Math.max(cols, 0)).fill(0);
     const statics = sorted.filter((item) => item.static);
@@ -81,7 +77,7 @@ function sweepFast(layout: Layout, cols: number, overlap: boolean): Layout {
     if (layout.length === 0) return layout;
     const work = toWorking(layout);
     const sorted = [...work].sort(
-        (a, b) => byColumnThenRow(a, b) || staticsFirst(a, b),
+        (a, b) => a.x - b.x || a.y - b.y || staticsFirst(a, b),
     );
     const tide: number[] = [];
     const statics = sorted.filter((item) => item.static);
