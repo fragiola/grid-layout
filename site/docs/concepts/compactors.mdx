@@ -1,0 +1,67 @@
+---
+title: Compactors
+description: How a layout settles, the compactors that ship apart from the main entry, and how to write your own.
+---
+
+A **compactor** settles the layout after every change. It is an object: a `type`, which says how a
+move pushes the items it lands on (`vertical`, `horizontal` or `none`), and a `compact(layout,
+cols)` that returns the layout settled, never changing the one it is given.
+
+The main entry has `verticalCompactor` (the default), `horizontalCompactor` and `noCompactor`
+([Collisions and compaction](/docs/concepts/collisions-and-compaction)). More come from their own
+entry, so a grid that does not use them never loads them:
+
+```tsx title="flow.tsx"
+import { GridLayout } from "@fragiola/grid-layout-react";
+import { wrapCompactor } from "@fragiola/grid-layout-react/compactors";
+
+<GridLayout.Root compactor={wrapCompactor}>…</GridLayout.Root>
+```
+
+| compactor | what it does |
+| --- | --- |
+| `wrapCompactor` | items flow in reading order like words in a paragraph, wrapping at the last column; dragging one reorders the flow |
+| `fastVerticalCompactor` | the vertical result in one pass, for hundreds or thousands of items |
+| `fastHorizontalCompactor` | the horizontal result in one pass |
+| `…OverlapCompactor` | the same for a grid with `allowOverlap`, as React Grid Layout's: it leaves statics and items already overlapping as they are |
+
+With `allowOverlap`, a grid runs only a compactor made for overlap (`overlap: true`); any other is
+skipped, and nothing settles.
+
+The fast compactors give the standard ones' results on a layout without overlaps (what a grid
+commits), and a valid layout (no overlap, statics in place) on any. On a layout given with
+overlaps they may settle some items differently.
+
+A compactor made for overlap needs `allowOverlap`: the grid refuses one without it.
+
+## Writing one
+
+`createCompactor` takes care of the rest: statics stay, the others are settled one at a time in
+reading order, each given the items already placed, and an item that does not move keeps its
+object.
+
+```ts title="gravity.ts"
+import { collides } from "@fragiola/grid-layout-react";
+import { createCompactor } from "@fragiola/grid-layout-react/compactors";
+
+// every item slides toward the start of its row
+export const gravityToStart = createCompactor("horizontal", "row", (item, { placed }) => {
+    item.x = Math.max(0, item.x);
+    while (item.x > 0 && !placed.some((other) => collides({ ...item, x: item.x - 1 }, other))) {
+        item.x -= 1;
+    }
+});
+```
+
+## Shrinking neighbours
+
+React Grid Layout leaves "a resize that shrinks its neighbours" out, and so does Grid Layout. A
+compactor can do it: given the layout after the resize, it narrows the items the resized one now
+overlaps instead of pushing them. Write it with `createCompactor` (or as a plain object), and keep
+the result valid: no overlap, every item inside the columns.
+
+<Example id="wrap-flow" />
+
+<Example id="fast-compactors" />
+
+<Example id="custom-compactor" />

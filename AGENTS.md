@@ -192,6 +192,39 @@ an implementation detail.
     the zone, at the grid's end (half a held item past it, with `autoSize`) and with the gesture.
     `autoScroll: false` turns it off. Native drags are the browser's to scroll.
 
+### Constraints, compactors and positioning (Epic #18)
+
+27. **Constraints are model rules (K1).** A constraint is `{ name, position?(item, ctx), size?(item,
+    ctx, side) }`, the item carrying the proposed place or size; `ctx` is `{ cols, maxRows,
+    layout, geometry, height }`. `item.move`, `item.resize`, `item.place` and `item.add` apply the
+    grid's constraints (model option and `grid.configure` `constraints`; default
+    `defaultConstraints`: `gridBounds`, then `minMaxSize`), then the item's own (merged), then keep
+    the box inside the columns (a hard rule: whole cells, row 0 or below), then push and compact,
+    once each (`layout/constraints.ts`, used by `layout/edit.ts`). Built-ins: `containerBounds`,
+    `boundedX`, `boundedY`, `aspectRatio(r)` (padding counted), `snapToGrid(sx, sy?)`, `minSize`,
+    `maxSize`; a factory given bad values returns a constraint with `invalid`, which the model
+    refuses (`invalid_payload`, or a `TypeError` at creation). `maxRows` is `gridBounds`' clamp.
+28. **Pixels per run (K2).** `run`/`can`/`check` take `{ env: { geometry, height } }` after the
+    payload; middleware reads `ctx.env`; the model never stores it. A plain run leaves pixel
+    constraints (`pixels: true`) to what they can do without, and the value of a placing command
+    names them in `skipped`. The engine passes its env to every preview and commit, the height
+    fixed at the gesture's start, and the commit asks for exactly what its last preview asked.
+29. **Constraints are data (K3).** Root takes `constraints` (keep it stable) and
+    `constraintRegistry` (read at creation); an item's `constraints` are names or `{ name, args }`
+    resolved from the registry (`ItemConstraint`), set through the layout or `item.configure`; an
+    unknown name is invalid. Rules that depend on the moment are middleware on `item.resize`.
+30. **Compactors entry (K4).** `@fragiola/grid-layout/compactors` (its own tsdown entry and export,
+    re-exported at `@fragiola/grid-layout-react/compactors`): `wrapCompactor`,
+    `fastVerticalCompactor`, `fastHorizontalCompactor`, their `…Overlap…` variants and
+    `createCompactor`. Never imported by the main entry. `Compactor.overlap` marks one that runs
+    under `allowOverlap`.
+31. **Scale (K5).** The engine reads the root's on-screen box against `offsetWidth`/`offsetHeight`
+    at each gesture's start and on measure, and divides pointer positions, drop offsets and the
+    auto-scroll reach by it; the `scale` option (Root's `scale`) overrides.
+32. **Cells (K6).** `engine.get("cells", { rows })` (`rows`: a number or `auto`, the shown layout's
+    bottom plus one) gives each cell's box; `GridLayout.Cells` / `useCells(rows)` render one element
+    per cell (`data-grid-layout-part="cell"`, `data-x`, `data-y`), structural position only.
+
 ## Commands
 
 | command | does |
@@ -331,6 +364,8 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
   - `ResizeHandle` (`useResizeHandle`): a `side` (`top`, `bottom`, `start`, `end` or a corner);
     `data-side`, `data-resizing`; renders nothing while its item cannot be resized. Where it
     sits and how it looks are the app's (the fixtures use logical insets).
+  - `Cells` (`useCells`): one element per cell of the grid, a background the app draws; `rows`
+    (a number or `auto`), `data-x`, `data-y`; `className`, `style` and `render` apply to each.
   - `Placeholder` (`usePlaceholder`): only during a gesture, at the box the held item would land
     in; `data-kind` (`move`, `resize`, `keyboard`, `drop`); a drop shows none off the grid or
     refused.

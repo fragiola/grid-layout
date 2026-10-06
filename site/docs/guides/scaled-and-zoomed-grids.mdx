@@ -1,0 +1,32 @@
+---
+title: Scaled and zoomed grids
+description: A grid inside a parent scaled by CSS, such as a zoomable canvas, drags and resizes under the pointer with no setting.
+---
+
+A grid inside a parent drawn with `transform: scale()` (a zoomable canvas, a preview at half size)
+works as it is. At the start of each gesture the engine compares the root's box on screen with its
+own size, and divides what the pointer does by that scale: the item stays under the pointer and
+lands in the cell it is over.
+
+```tsx title="canvas.tsx"
+<div style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
+    <GridLayout.Root>…</GridLayout.Root>
+</div>
+```
+
+The scale is read again at each gesture, so a zoom that changes between two drags needs nothing.
+The grid's own width is measured in its own pixels: a scale does not change its breakpoint.
+
+When the box on screen cannot tell (a scale that changes during a gesture, a transform the box
+does not show), give it:
+
+```tsx title="fixed-scale.tsx"
+<GridLayout.Root scale={0.5}>…</GridLayout.Root>
+```
+
+A drag source's `dragOffset` is on screen, in the page's pixels: the engine divides it by the scale
+too.
+
+A rotated or skewed parent is not supported.
+
+<Example id="scaled-container" />

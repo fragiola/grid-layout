@@ -1,0 +1,33 @@
+---
+title: A grid background
+description: Draw the grid's cells behind its items, as dots, lines or tiles, from cells the grid places for you.
+---
+
+`GridLayout.Cells` renders one element per cell of the grid, each placed exactly where an item of
+one column and one row would sit there, in both directions. It draws nothing itself: the look is
+yours, through `className`, `style` or `render`, and each cell's `data-x` and `data-y`.
+
+```tsx title="dotted.tsx"
+<GridLayout.Root className="group">
+    <GridLayout.Cells className="rounded border border-dotted opacity-0 group-data-[dragging]:opacity-100" />
+    <GridLayout.Items>{(item) => <GridLayout.Item itemId={item.id} />}</GridLayout.Items>
+</GridLayout.Root>
+```
+
+Put the cells before the items: they are drawn under them, and a press on a cell is a press on the
+grid.
+
+`rows` is how many rows of cells: a number, or `auto` (the default), the layout's bottom plus one.
+With `auto` the cells follow a gesture's preview: a drag toward the bottom adds the row it reaches.
+
+A children function renders inside each cell, from its state (`{ x, y }`):
+
+```tsx title="labelled.tsx"
+<GridLayout.Cells rows={4}>{(cell) => cell.x === 0 && <span>{cell.y + 1}</span>}</GridLayout.Cells>
+```
+
+`useCells(rows)` is the hook underneath: each cell's state and the props to spread, for a
+background drawn another way. The engine's `get("cells", { rows })` gives the cells' boxes in
+pixels, for a canvas.
+
+<Example id="grid-background" />

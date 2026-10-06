@@ -71,7 +71,30 @@ items per preview. The fast compactors of Epic #18 address large layouts.
     one added or removed on a breakpoint is added or removed on the others at their next
     activation, while each keeps its own places. A width wavering at a threshold (a scrollbar)
     settles: crossing back the threshold just crossed needs 24 px more.
-13. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
+13. **Constraints are model rules** (added by Epic #18, K1–K3). React Grid Layout applies them
+    during gestures only; here every command that places or sizes an item does, so the keyboard,
+    drops and `model.run` obey them, and a preview is its commit's dry run. The columns stay a hard
+    rule: whatever the constraints say (`boundedY`, none at all), an item stays inside them, at
+    row 0 or below, on whole cells. `maxRows` is `gridBounds`' clamp instead of an
+    `invalid_payload`. An item stores its own constraints as names (with a factory's `args`)
+    resolved from a registry, never as objects, so a layout serialises. A factory given bad values
+    returns an `invalid` constraint instead of throwing. `aspectRatio` and `containerBounds` count
+    the padding. Without an engine's pixels (a plain `model.run`), `aspectRatio` does nothing and
+    `containerBounds` bounds by `maxRows`, and the result names them in `skipped`. A constraint
+    receives the item with the proposed place (or size) in it, and a resize side is logical.
+14. **The opt-in compactors** (added by Epic #18, K4). Each works on a copy (an unmoved item keeps
+    its object, the input's order is kept). The wrap compactor resolves moves horizontally
+    (react-grid-layout#2252, fixed for the standard horizontal compactor too: a move toward the
+    start onto a neighbour swaps them) and gives an item cells free for its whole size, so items
+    larger than a cell never overlap. The fast vertical compactor leaves an item outside the
+    columns on its row (React Grid Layout's rises to minus infinity); the fast horizontal one
+    places an item as wide as the grid at the first row free at the start, with no warning. A
+    compactor flagged `overlap` runs under `allowOverlap`; any other is skipped there.
+15. **Scale is read, not configured** (added by Epic #18, K5): the root's box on screen against its
+    layout size, at each gesture's start, replaces `transformScale` and `createScaledStrategy`; a
+    `scale` option overrides it. **Cells replace `GridBackground`** (K6): one element per cell,
+    placed by the grid, drawn by the app; no SVG, no colours.
+16. **What React Grid Layout does not have**: the keyboard (grab, move, resize, drop, cancel),
     logical sides and right-to-left, middleware that can refuse a gesture's landing (the preview
     shows the item going back), and `item.place` for a move and a resize at once.
 
@@ -102,7 +125,4 @@ on load; a corrected controlled layout not always told). Open:
   (outside access) fits here, since sources live outside the root.
 - **Responsive and mobile (#13)**: the model already stores layouts per breakpoint. Item bodies on
   touch need long-press activation; handles already take touch.
-- **Constraints and compactors (#18)**: the compactor is a strategy object, so wrap and fast
-  compactors plug in; constraints become model rules applied by `item.move`, `item.resize`,
-  `item.place` and `item.add` alike.
 - **Parity (#22)**: the deviations above are the parity audit's starting list.

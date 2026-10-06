@@ -9,7 +9,7 @@ absent, never `"false"`.
 ## Parts
 
 Every part carries `data-grid-layout-part`: `root`, `item`, `drag-handle`, `resize-handle`,
-`placeholder`, `drag-source` or `drag-preview`. Items carry `data-item-id`. Tests select by them,
+`placeholder`, `drag-source`, `drag-preview` or `cell`. Items carry `data-item-id`. Tests select by them,
 never by class names.
 
 ## States
@@ -33,6 +33,7 @@ never by class names.
 | `data-side` | resize handle | its side: `top`, `bottom`, `start`, `end` or a corner |
 | `data-breakpoint` | root | the active breakpoint's name |
 | `data-kind` | placeholder | `move`, `resize`, `keyboard` or `drop` |
+| `data-x`, `data-y` | cell | its column and row |
 
 ## From state functions
 

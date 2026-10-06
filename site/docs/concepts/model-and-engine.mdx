@@ -49,7 +49,9 @@ model.use((ctx, next) => {
 ```
 
 A gesture checks the model while it runs: a landing a middleware would refuse shows the item going
-back where it was, and the drop changes nothing.
+back where it was, and the drop changes nothing. The engine passes its pixels to each check and
+each command it runs (`{ env }`, the third argument of `run`, `can` and `check`), for the
+[constraints](/docs/concepts/constraints) that need them; the model never keeps them.
 
 ## The engine
 

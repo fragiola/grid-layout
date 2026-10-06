@@ -4,7 +4,8 @@ description: What is not built yet, what the examples do meanwhile, and the orde
 ---
 
 The layout rules, the model, the engine, the React primitives, the keyboard, right-to-left, drops
-from outside the grid, responsive grids and touch are in. Much of a full grid layout is still to
+from outside the grid, responsive grids, touch, constraints, the wrap and fast compactors, scaled
+containers and the grid background are in. Much of a full grid layout is still to
 come.
 
 ## The gaps
@@ -19,14 +20,15 @@ come.
 | No **pinch-zoom** of the grid. | Let the page zoom. |
 | Touch is checked in Chromium's real touch input and in WebKit on an iPhone's viewport (synthetic touch), not on a real iPhone. | Check your app on a device; the [guide](/docs/guides/mobile-and-touch) lists what iOS needs from your CSS. |
 | Native drags from the operating system are checked with synthetic events in the end-to-end tests (Chromium and Firefox), not with real files. React Grid Layout's Firefox workaround (a class name on the dragged-over element) is not used: the grid counts the drag's enter and leave events and reads where a leave goes. | Report a browser where a file drag over items behaves differently. |
-| No **constraints** beyond an item's own limits (aspect ratios, snapping), no wrap or fast compactor. | `minW`, `maxW`, `minH`, `maxH`, and middleware on `item.resize`. |
+| The columns are a hard rule: `boundedY` (or no constraints) never lets an item **past the last column**, as React Grid Layout's does. | Add columns, or use `allowOverlap` with a wider grid. |
+| `aspectRatio` holds the ratio as closely as **whole rows** allow (within half a row). | Use small rows (a `rowHeight` of a few pixels and a row gap of 0) for a ratio within a pixel. |
+| A plain `model.run` has no pixels: `aspectRatio` is skipped and `containerBounds` falls back to `maxRows` (the result's `skipped` names them). | Pass the engine's pixels: `{ env: { geometry: engine.get("geometry") } }`. |
+| No **rotated or skewed** parent: only a scale is read off the grid's box. | Keep rotations outside the grid's ancestors, or pass `scale` when the box cannot tell it. |
 | With `allowOverlap`, no **bring to front**: the layout's order is the drawing order. | Reorder the layout. |
 
 ## The roadmap
 
-1. **Constraints, compactors and positioning**: pluggable constraints, aspect ratios, wrap and
-   fast compactors, scaled containers, a grid background.
-2. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
+1. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
    Layout.
-3. **Between grids**: an item dragged from one grid into another.
-4. **Per-breakpoint visibility**: an item shown on some breakpoints only.
+2. **Between grids**: an item dragged from one grid into another.
+3. **Per-breakpoint visibility**: an item shown on some breakpoints only.
