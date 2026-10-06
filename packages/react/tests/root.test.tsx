@@ -44,7 +44,7 @@ describe("GridLayout.Root", () => {
         expect(box("a").tabIndex).toBe(0);
     });
 
-    it("uncontrolled: a drop stands, and onLayoutChange is told once", () => {
+    it("uncontrolled: a drop stands, and onLayoutChange is told once (react-grid-layout#1984)", () => {
         stubBrowser();
         const onLayoutChange = vi.fn();
         render(<Grid defaultLayout={two} onLayoutChange={onLayoutChange} />);

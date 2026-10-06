@@ -121,7 +121,7 @@ an implementation detail.
     with an enter/leave counter, answered by `onExternalDrag(event)`: `{ w, h, data? }` accepts,
     `false` refuses (`data-drop-refused`), `undefined` lets it pass; asked again on the drop, when
     the files can be read (that answer can refuse and gives the data; the size stays the shown
-    one). The drag image is the app's: `GridLayout.DragPreview`, kept at the pointer by the engine.
+    one); the answer may carry a `dragOffset`, as a source's. The drag image is the app's: `GridLayout.DragPreview`, kept at the pointer by the engine.
 16. **Preview, then commit (X2).** A drop is a gesture of kind `drop`. Its preview is the model's
     dry run of `item.add` against the layout at the gesture's start, under the id the drop
     commits (made when the drop begins); it never enters the model nor `onLayoutChange`. The item is
@@ -279,6 +279,12 @@ wholesale. What Grid Layout takes from it is behaviour (how items push, how comp
 a resize anchors its opposite edge), checked by its behavioural tests where they hold. What it
 leaves behind on purpose: in-place mutation of layouts, child-key synchronisation (`data-grid`),
 `WidthProvider`, the shipped CSS, `react-draggable`/`react-resizable`, and the legacy v1 API.
+
+[`docs/react-grid-layout-parity.md`](docs/react-grid-layout-parity.md) maps each of its examples and
+v2 features to ours (an example, our API, a decision, an exclusion or a gap; P1: parity is
+behaviour, not API), and [`docs/react-grid-layout-issues.md`](docs/react-grid-layout-issues.md)
+gives a verdict on each of its known bugs and hazards, with the test named `react-grid-layout#<n>`
+that pins it.
 
 ## Conventions
 

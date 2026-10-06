@@ -75,6 +75,21 @@ describe("the breakpoint", () => {
         expect(seen).toEqual(["sm", "lg"]);
     });
 
+    it("settles a sub-pixel width wavering at a threshold, once a measure: no loop (react-grid-layout#2271)", () => {
+        const grid = setup(responsive());
+        const seen = switches(grid.model);
+        const views = grid.views();
+        // a zoomed page measures fractions of a pixel, a hair either side of lg's 996
+        const widths = [995.4, 996.4, 995.2, 996.6, 995.4, 996.4];
+        for (const width of widths) {
+            grid.resizeTo(width);
+            expect(Number.isInteger(grid.view().width)).toBe(true);
+        }
+        // one switch, and a view per measure plus the switch's: nothing feeds back
+        expect(seen).toEqual(["sm"]);
+        expect(grid.views() - views).toBeLessThanOrEqual(widths.length + 1);
+    });
+
     it("lets a controlled breakpoint override the width, the width deciding again once released", () => {
         const grid = setup(responsive());
         grid.engine.adapter.setOptions({

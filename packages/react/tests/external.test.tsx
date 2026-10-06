@@ -1,5 +1,6 @@
 import type { Layout } from "@fragiola/grid-layout";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
     createGridLayoutRef,
@@ -396,6 +397,70 @@ describe("native drags on the root", () => {
             expect.objectContaining({ data: ["plan.pdf"] }),
         );
         expect(gridLayoutRef.current?.model.get("layout")).toHaveLength(3);
+    });
+});
+
+describe("React Grid Layout's issues", () => {
+    it("tells no layout change and loops no update while a source goes in and out (react-grid-layout#2219, react-grid-layout#2204, react-grid-layout#2210)", () => {
+        stubBrowser();
+        const gridLayoutRef = createGridLayoutRef();
+        const onLayoutChange = vi.fn();
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <Board
+                gridLayoutRef={gridLayoutRef}
+                onLayoutChange={onLayoutChange}
+            />,
+        );
+        const press = pointer(screen.getByTestId("source"), 1300, 500);
+        // in and out of the grid, the button held, then let go outside
+        for (let pass = 0; pass < 3; pass++) {
+            press.move(...centre(4, 0));
+            expect(screen.getByTestId("placeholder")).toBeTruthy();
+            press.move(1300, 500);
+            expect(screen.queryByTestId("placeholder")).toBeNull();
+        }
+        act(() => press.release(1300, 500));
+        expect(onLayoutChange).not.toHaveBeenCalled();
+        expect(gridLayoutRef.current?.model.get("layout")).toHaveLength(2);
+        expect(spy).not.toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
+    it("clears the drop and drags again when a controlled parent takes the drop (react-grid-layout#2263)", () => {
+        stubBrowser();
+        const gridLayoutRef = createGridLayoutRef();
+        function Parent() {
+            const [layout, setLayout] = useState<Layout>(two);
+            const [, setDrops] = useState(0);
+            return (
+                <Board
+                    gridLayoutRef={gridLayoutRef}
+                    layout={layout}
+                    onLayoutChange={(next) => setLayout(next)}
+                    // the app's own state, set in the same drop
+                    onDrop={() => setDrops((drops) => drops + 1)}
+                />
+            );
+        }
+        render(<Parent />);
+        const press = pointer(screen.getByTestId("source"), 1300, 500);
+        press.move(...centre(4, 0));
+        act(() => press.release(...centre(4, 0)));
+        expect(screen.queryByTestId("placeholder")).toBeNull();
+        expect(screen.getByTestId("grid").hasAttribute("data-dropping")).toBe(
+            false,
+        );
+        expect(gridLayoutRef.current?.engine.get("gesture")).toBeUndefined();
+        expect(gridLayoutRef.current?.model.get("layout")).toHaveLength(3);
+        // the next gesture starts as usual
+        const drag = pointer(screen.getByTestId("item-a"), ...cell(0, 0));
+        drag.move(...cell(8, 0));
+        expect(screen.getByTestId("placeholder")).toBeTruthy();
+        act(() => drag.release(...cell(8, 0)));
+        expect(
+            gridLayoutRef.current?.model.get("item-by", { itemId: "a" }),
+        ).toMatchObject({ x: 8 });
     });
 });
 

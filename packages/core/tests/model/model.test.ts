@@ -15,6 +15,7 @@ import {
     veto,
 } from "../../src/model/model";
 import type { CommandEvent, GridLayoutModel } from "../../src/model/types";
+import { frozen } from "../layout/helpers";
 
 const item = (
     id: string,
@@ -662,5 +663,27 @@ describe("the command list", () => {
         for (const command of COMMANDS) {
             expect(command).toMatch(/^[a-z]+(-[a-z]+)*\.[a-z]+(-[a-z]+)*$/);
         }
+    });
+});
+
+describe("React Grid Layout's issues", () => {
+    it("runs every command over frozen layouts and never writes to them (react-grid-layout#2182)", () => {
+        // a frozen object throws on a write in a module: an in-place mutation would fail here
+        const given = frozen(dashboard());
+        const copy = JSON.stringify(given);
+        const model = createGridLayoutModel({ cols: 4, layout: given });
+        const runs = [
+            model.run("item.move", { itemId: "c", x: 0, y: 0 }),
+            model.run("item.resize", { itemId: "a", w: 3, h: 1 }),
+            model.run("item.place", { itemId: "b", x: 1, y: 2, w: 2, h: 2 }),
+            model.run("item.add", { item: { id: "d", w: 2, h: 1 } }),
+            model.run("item.remove", { itemId: "a" }),
+            model.run("layout.set", { layout: frozen(dashboard()) }),
+            model.run("grid.configure", {
+                settings: { compactor: horizontalCompactor },
+            }),
+        ];
+        expect(runs.map((result) => result.ok)).toEqual(runs.map(() => true));
+        expect(JSON.stringify(given)).toBe(copy);
     });
 });

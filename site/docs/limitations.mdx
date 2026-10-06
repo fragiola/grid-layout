@@ -5,8 +5,9 @@ description: What is not built yet, what the examples do meanwhile, and the orde
 
 The layout rules, the model, the engine, the React primitives, the keyboard, right-to-left, drops
 from outside the grid, responsive grids, touch, constraints, the wrap and fast compactors, scaled
-containers and the grid background are in. Much of a full grid layout is still to
-come.
+containers, the grid background, model API recipes and a real-world gallery are in, and an audit
+against React Grid Layout ([parity](https://github.com/fragiola/grid-layout/blob/main/docs/react-grid-layout-parity.md),
+[known issues](https://github.com/fragiola/grid-layout/blob/main/docs/react-grid-layout-issues.md)) says where Grid Layout stands.
 
 ## The gaps
 
@@ -24,11 +25,13 @@ come.
 | `aspectRatio` holds the ratio as closely as **whole rows** allow (within half a row). | Use small rows (a `rowHeight` of a few pixels and a row gap of 0) for a ratio within a pixel. |
 | A plain `model.run` has no pixels: `aspectRatio` is skipped and `containerBounds` falls back to `maxRows` (the result's `skipped` names them). | Pass the engine's pixels: `{ env: { geometry: engine.get("geometry") } }`. |
 | No **rotated or skewed** parent: only a scale is read off the grid's box. | Keep rotations outside the grid's ancestors, or pass `scale` when the box cannot tell it. |
+| No per-item **`bounded`**: bounding the drawn item is grid-wide. | A `containerBounds` item constraint keeps where the item lands inside the grid. |
 | With `allowOverlap`, no **bring to front**: the layout's order is the drawing order. | Reorder the layout. |
 
 ## The roadmap
 
-1. **Parity and gallery**: model API recipes, real-world apps and an audit against React Grid
-   Layout.
-2. **Between grids**: an item dragged from one grid into another.
-3. **Per-breakpoint visibility**: an item shown on some breakpoints only.
+1. **Between grids**: an item dragged from one grid into another.
+2. **Per-breakpoint visibility**: an item shown on some breakpoints only.
+3. **Per-item bounds**: `bounded` for one item (parity gap G1).
+4. **Publishing**: the packages on npm, and the Fragiola UI styled layer.
+5. **More adapters**: the core is framework-free, ready for another.

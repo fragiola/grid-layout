@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { noCompactor } from "../../src/layout/compact";
+import { horizontalCompactor, noCompactor } from "../../src/layout/compact";
 import { itemPixels } from "../../src/layout/geometry";
 import type { LayoutItem } from "../../src/layout/types";
 import { veto } from "../../src/model/model";
@@ -74,7 +74,7 @@ describe("measuring and placing", () => {
 });
 
 describe("dragging with a pointer", () => {
-    it("stays a click under the threshold", () => {
+    it("stays a click under the threshold (react-grid-layout#1341, react-grid-layout#1401)", () => {
         const grid = setup(two());
         const before = grid.views();
         const press = pointer(grid.item("a"), ...at(0, 0));
@@ -740,5 +740,143 @@ describe("the app's side", () => {
         const press = pointer(grid.item("a"), ...at(0, 0));
         press.move(...at(3, 1));
         expect(grid.events).toEqual([]);
+    });
+});
+
+// React Grid Layout's reported bugs that live in the engine: each test is named after the
+// upstream issue, and docs/react-grid-layout-issues.md says what Grid Layout does about it.
+describe("React Grid Layout's issues", () => {
+    it("commits a release that comes before the drag's first frame (react-grid-layout#2291)", () => {
+        const grid = setup(two());
+        const press = pointer(grid.item("a"), ...at(0, 0));
+        // press, a move past the threshold and the release, back to back: no frame in between
+        press.moveOnly(...at(3, 0));
+        press.release(...at(3, 0));
+        expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
+            x: 3,
+            y: 0,
+        });
+        expect(grid.events.at(-1)?.type).toBe("drag-stop");
+        expect(grid.view().gesture).toBeUndefined();
+    });
+
+    it("leaves the layout as it was when an item is dropped where it started (react-grid-layout#1968, react-grid-layout#2151)", () => {
+        const layout = [
+            item("a", 0, 0, 2, 2),
+            item("b", 2, 0, 2, 1),
+            item("c", 0, 2, 2, 3),
+            item("d", 2, 1, 2, 2),
+            item("e", 0, 5, 4, 1),
+        ];
+        const grid = setup({ layout });
+        const start = grid.model.get("layout");
+        const press = pointer(grid.item("a"), ...at(0, 0));
+        let moved = false;
+        for (const [x, y] of [
+            [0, 2],
+            [0, 4],
+            [2, 3],
+            [1, 1],
+            [0, 0],
+        ] as const) {
+            press.move(...at(x, y));
+            moved ||= grid.view().gesture?.preview !== start;
+        }
+        expect(moved).toBe(true);
+        press.release(...at(0, 0));
+        expect(grid.model.get("layout")).toBe(start);
+    });
+
+    it("leaves a horizontal layout as it was when an item is dragged over others and back (react-grid-layout#2156)", () => {
+        const layout = [
+            item("a", 0, 0, 2, 2),
+            item("b", 2, 0, 2, 1),
+            item("c", 4, 0, 3, 2),
+            item("d", 0, 2, 4, 1),
+            item("e", 4, 2, 2, 2),
+        ];
+        const grid = setup({ layout, compactor: horizontalCompactor });
+        const start = grid.model.get("layout");
+        let moved = false;
+        const press = pointer(grid.item("a"), ...at(0, 0));
+        for (const [x, y] of [
+            [1, 0],
+            [3, 1],
+            [5, 2],
+            [8, 3],
+            [2, 2],
+            [0, 0],
+        ] as const) {
+            press.move(...at(x, y));
+            moved ||= grid.view().gesture?.preview !== start;
+        }
+        // the drag did push the others on its way, and every step is computed from the layout
+        // at the gesture's start: back where it began, nothing has moved
+        expect(moved).toBe(true);
+        expect(grid.view().gesture?.preview).toBe(start);
+        press.release(...at(0, 0));
+        expect(grid.model.get("layout")).toBe(start);
+    });
+
+    it("keeps an item in its cell after a short drag on thin columns with a wide gap (react-grid-layout#2014)", () => {
+        // 10 columns of 44px on 800px, 40px apart: thin columns, as in the report
+        const grid = setup({
+            cols: 10,
+            width: 800,
+            layout: [item("a", 3, 0, 1, 1), item("b", 7, 0, 2, 1)],
+            engine: { gap: [40, 0] },
+        });
+        const start = grid.model.get("layout");
+        for (const id of ["a", "b"]) {
+            const rect = grid.view().rects[id];
+            if (!rect) throw new Error(`no box for ${id}`);
+            const press = pointer(grid.item(id), rect.left + 2, rect.top + 2);
+            press.move(rect.left + 8, rect.top + 2);
+            expect(grid.view().gesture?.kind).toBe("move");
+            press.release(rect.left + 8, rect.top + 2);
+        }
+        expect(grid.model.get("layout")).toBe(start);
+    });
+
+    it("keeps a bounded item under the pointer, reaching the last columns with padding (react-grid-layout#2096, react-grid-layout#2133)", () => {
+        const grid = setup({
+            ...two(),
+            engine: { bounded: true, padding: [40, 40] },
+        });
+        const rect = grid.view().rects.a;
+        if (!rect) throw new Error("no box for a");
+        const press = pointer(grid.item("a"), rect.left + 10, rect.top + 10);
+        // inside the root: the item stays where the pointer holds it
+        press.move(rect.left + 300, rect.top + 10);
+        expect(grid.item("a").style.transform).toBe(
+            `translate(${rect.left + 290}px, ${rect.top}px)`,
+        );
+        // far past the end edge: held at the root's edge, landing in the last columns
+        press.move(5000, rect.top + 10);
+        expect(grid.item("a").style.transform).toBe(
+            `translate(${1200 - rect.width}px, ${rect.top}px)`,
+        );
+        press.release(5000, rect.top + 10);
+        expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
+            x: 10,
+            y: 0,
+        });
+    });
+
+    // the held item is drawn within what it can land at, as the placeholder (the model's dry run)
+    // shows: React Grid Layout 2.2 clamps the drawn size to the item's limits too (#2235)
+    it("draws a resized item no wider than its maxW, no narrower than its minW (react-grid-layout#2235)", () => {
+        const grid = setup({
+            layout: [item("a", 0, 0, 2, 2, { minW: 2, maxW: 3 })],
+        });
+        const handle = grid.resizeHandle("a", "end");
+        const press = pointer(handle, 200, 50);
+        press.move(200 + 6 * COLUMN, 50);
+        const widest = grid.view().gesture?.placeholder.width;
+        expect(grid.item("a").style.width).toBe(`${widest}px`);
+        press.move(200 - 3 * COLUMN, 50);
+        const narrowest = grid.view().gesture?.placeholder.width;
+        expect(grid.item("a").style.width).toBe(`${narrowest}px`);
+        press.release(200 - 3 * COLUMN, 50);
     });
 });

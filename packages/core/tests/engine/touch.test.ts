@@ -48,7 +48,7 @@ describe("a touch on an item's body", () => {
         });
     });
 
-    it("lets the page scroll when it moves before it is held long enough", () => {
+    it("lets the page scroll when it moves before it is held long enough (react-grid-layout#1793)", () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
         const grid = setup(two());
         const press = pointer(grid.item("a"), 20, 20, touch);

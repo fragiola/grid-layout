@@ -305,6 +305,25 @@ describe("moveItem", () => {
         expect(boxes(bounded)).toEqual({ A: [0, 2, 1, 2] });
     });
 
+    it("swaps a short item moved down onto a tall one before it reaches the tall one's bottom (react-grid-layout#2053)", () => {
+        // the report: the swap came only near the tall item's bottom. Here a move from where the
+        // short item was swaps them two rows in, whatever the tall item's height
+        for (const h of [3, 6, 9]) {
+            const input = frozen([
+                item("S", 0, 0, 2, 1),
+                item("T", 0, 1, 2, h),
+            ]);
+            expect(boxes(moveItem(input, "S", 0, 2, rules))).toEqual({
+                S: [0, 0, 2, 1],
+                T: [0, 1, 2, h],
+            });
+            expect(boxes(moveItem(input, "S", 0, 3, rules))).toEqual({
+                S: [0, h, 2, 1],
+                T: [0, 0, 2, h],
+            });
+        }
+    });
+
     it("returns the same layout for an unknown item or the same cell", () => {
         const input = frozen([item("A", 0, 0, 2, 1)]);
         expect(moveItem(input, "nope", 1, 1, rules)).toBe(input);

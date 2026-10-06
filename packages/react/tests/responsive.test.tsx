@@ -141,6 +141,32 @@ describe("a responsive root", () => {
         expect(ignored).toHaveBeenCalledTimes(1);
     });
 
+    it("takes layouts written inline at every render, with no update loop (react-grid-layout#2202)", () => {
+        const told = vi.fn();
+        function Parent({ width }: { width: number }) {
+            const [, setRenders] = useState(0);
+            return (
+                <Grid
+                    width={width}
+                    // a new object at every render, as the report's inline `layouts`
+                    layouts={{ lg: LG }}
+                    onLayoutChange={() => {
+                        told();
+                        setRenders((renders) => renders + 1);
+                    }}
+                />
+            );
+        }
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const { rerender } = render(<Parent width={1200} />);
+        expect(told).not.toHaveBeenCalled();
+        rerender(<Parent width={800} />);
+        rerender(<Parent width={800} />);
+        expect(told).toHaveBeenCalledTimes(1);
+        expect(spy).not.toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
     it("tells a switch to a breakpoint whose items changed meanwhile once", () => {
         const gridLayoutRef = createGridLayoutRef();
         const onLayoutChange = vi.fn();
