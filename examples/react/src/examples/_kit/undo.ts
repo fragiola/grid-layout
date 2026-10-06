@@ -145,7 +145,8 @@ export function createUndoHistory<L>(
                 before: event.before.layouts,
                 after: event.after.layouts,
             },
-        ].slice(-limit);
+            // the last `limit` steps; a limit of 0 keeps none
+        ].slice(limit > 0 ? -limit : Number.POSITIVE_INFINITY);
         undone = [];
         changed();
     });

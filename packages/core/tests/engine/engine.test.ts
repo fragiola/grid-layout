@@ -879,4 +879,21 @@ describe("React Grid Layout's issues", () => {
         expect(grid.item("a").style.width).toBe(`${narrowest}px`);
         press.release(200 - 3 * COLUMN, 50);
     });
+
+    it("draws a resized item no taller than maxRows lets it land (react-grid-layout#2235)", () => {
+        // settled at row 0: four rows to grow into
+        const grid = setup({
+            maxRows: 4,
+            layout: [item("a", 0, 2, 2, 1)],
+        });
+        const handle = grid.resizeHandle("a", "bottom");
+        const press = pointer(handle, 100, 200);
+        press.move(100, 200 + 5 * 60);
+        const shown = grid.view().gesture?.placeholder.height;
+        expect(grid.item("a").style.height).toBe(`${shown}px`);
+        press.release(100, 200 + 5 * 60);
+        expect(grid.model.get("item-by", { itemId: "a" })).toMatchObject({
+            h: 4,
+        });
+    });
 });

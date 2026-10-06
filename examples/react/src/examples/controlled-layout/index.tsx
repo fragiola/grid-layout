@@ -1,6 +1,10 @@
 "use client";
 
-import { GridLayout, type Layout } from "@fragiola/grid-layout-react";
+import {
+    GridLayout,
+    type Layout,
+    verticalCompactor,
+} from "@fragiola/grid-layout-react";
 import { RotateCcw, Shuffle } from "lucide-react";
 import { useState } from "react";
 import { Clickable } from "#/components/atoms/clickable";
@@ -19,8 +23,8 @@ const START: Layout = [
 ];
 
 /**
- * The same items in another order, packed row by row: inside the columns and never overlapping
- * (the grid settles what compaction would lift). Never the order it had.
+ * The same items in another order, packed row by row and settled as the grid settles them (its
+ * compactor), so the grid takes the state as it is and tells nothing back. Never the order it had.
  */
 function shuffled(layout: Layout): Layout {
     const order = (items: Layout) => items.map((item) => item.id).join();
@@ -31,7 +35,7 @@ function shuffled(layout: Layout): Layout {
     let x = 0;
     let y = 0;
     let tallest = 0;
-    return next.map((item) => {
+    const packed = next.map((item) => {
         if (x + item.w > COLS) {
             x = 0;
             y += tallest;
@@ -42,6 +46,7 @@ function shuffled(layout: Layout): Layout {
         tallest = Math.max(tallest, item.h);
         return placed;
     });
+    return verticalCompactor.compact(packed, COLS);
 }
 
 /** One line per item: what the state holds, readable. */

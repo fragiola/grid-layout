@@ -14,8 +14,6 @@ import {
     type ConstraintEnv,
     constrainMove,
     constrainResize,
-    defaultConstraints,
-    minMaxSize,
 } from "../layout/constraints";
 import { firstFreeCell } from "../layout/edit";
 import {
@@ -167,6 +165,8 @@ interface Session {
     scrolling: number | undefined;
     /** what scrolls each way, found once the gesture first nears an edge (`null`: nothing) */
     scrollers: { x: Element | null; y: Element | null } | undefined;
+    /** a resize: the smallest and largest boxes it can land at, found at its first frame */
+    limits: { least: PixelRect; most: PixelRect } | undefined;
     /** a touch holds the item: the page must not scroll under it */
     touch: boolean;
     /** removes what the session listens to */
@@ -201,6 +201,9 @@ interface Preview {
  * that a breakpoint's taller layout brings (or takes away) never flips it back (no resize loop).
  */
 const SETTLE = 24;
+
+/** Rows past any a pointer reaches: a resize's largest ask, bounded only by its constraints. */
+const UNBOUNDED_ROWS = 100_000;
 
 /** The gap and the row height a grid takes by default. */
 const DEFAULT_GAP: readonly [number, number] = [10, 10];
@@ -823,6 +826,7 @@ export function createGridLayoutEngine(
             last: undefined,
             scrolling: undefined,
             scrollers: undefined,
+            limits: undefined,
             touch: false,
             cleanup: [],
         };
@@ -1001,49 +1005,30 @@ export function createGridLayoutEngine(
     }
 
     /**
-     * The size a resized item is drawn at, in pixels: within what it can land at, its limits (while
-     * the grid's constraints keep `minMaxSize`) and the columns its fixed edge leaves.
+     * The smallest and largest boxes a resize can land at, in pixels: what the model's own
+     * constraints give the extreme sizes (its limits, `maxRows`, an item's own constraints), the
+     * fixed edges kept. Asked once per gesture; the frames only clamp to them.
      */
-    function drawnSize(
+    function drawLimits(
         current: Session,
         geometry: GridGeometry,
-        width: number,
-        height: number,
-    ): { width: number; height: number } {
-        const { before } = current;
-        const { inline, block } = sideEdges(current.side ?? "bottom-end");
-        const limited = (
-            model.state.constraints ?? defaultConstraints
-        ).includes(minMaxSize);
-        const cols = model.state.cols;
-        const room = inline === "start" ? before.x + before.w : cols - before.x;
-        const minW = limited ? Math.min(before.minW ?? 1, room) : 1;
-        const maxW = Math.min(limited ? (before.maxW ?? cols) : cols, room);
-        const minH = limited ? (before.minH ?? 1) : 1;
-        const maxH = Math.min(
-            limited
-                ? (before.maxH ?? Number.POSITIVE_INFINITY)
-                : Number.POSITIVE_INFINITY,
-            block === "top" ? before.y + before.h : Number.POSITIVE_INFINITY,
-        );
-        // the pixels of a box of `w` × `h` with the fixed edges where they are: what a landing
-        // there shows, rounding included
-        const box = (w: number, h: number) =>
-            itemPixels(geometry, {
-                x: inline === "start" ? before.x + before.w - w : before.x,
-                y: block === "top" ? before.y + before.h - h : before.y,
-                w,
-                h,
-            });
-        const least = box(minW, minH);
-        const most = box(maxW, Number.isFinite(maxH) ? maxH : minH);
-        return {
-            width: Math.max(least.width, Math.min(width, most.width)),
-            height: Math.max(
-                least.height,
-                Number.isFinite(maxH) ? Math.min(height, most.height) : height,
-            ),
-        };
+    ): { least: PixelRect; most: PixelRect } {
+        const rules = rulesOf(model.state);
+        const side = current.side ?? "bottom-end";
+        const at = (w: number, h: number) =>
+            itemPixels(
+                geometry,
+                constrainResize(
+                    current.before,
+                    side,
+                    { w, h },
+                    rules,
+                    current.start,
+                    current.env,
+                ),
+            );
+        // as far as a pointer can pull: every column, and rows past any reach
+        return { least: at(1, 1), most: at(rules.cols, UNBOUNDED_ROWS) };
     }
 
     /** Applies the last pointer position: the item drawn at it, and the preview retargeted. */
@@ -1102,13 +1087,21 @@ export function createGridLayoutEngine(
                 height = start.height - dy;
                 top = start.top + dy;
             }
-            // drawn no smaller or larger than it can land (react-grid-layout#2235): the item's
-            // limits while the constraints keep them, and the room its fixed edges leave
-            const drawn = drawnSize(current, geometry, width, height);
-            if (inline === "start") left += width - drawn.width;
-            if (block === "top") top += height - drawn.height;
-            width = drawn.width;
-            height = drawn.height;
+            // drawn no smaller or larger than it can land (react-grid-layout#2235)
+            current.limits ??= drawLimits(current, geometry);
+            const { least, most } = current.limits;
+            const drawnWidth = Math.max(
+                least.width,
+                Math.min(width, most.width),
+            );
+            const drawnHeight = Math.max(
+                least.height,
+                Math.min(height, most.height),
+            );
+            if (inline === "start") left += width - drawnWidth;
+            if (block === "top") top += height - drawnHeight;
+            width = drawnWidth;
+            height = drawnHeight;
             if (current.element) {
                 place(current.element, {
                     left,
