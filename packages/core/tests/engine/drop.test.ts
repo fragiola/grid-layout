@@ -831,3 +831,33 @@ describe("listeners", () => {
         expect(grid.model.get("layout")).toHaveLength(2);
     });
 });
+
+describe("a native drag's offset", () => {
+    it("places the item away from the pointer by the answer's `dragOffset`, as a source's", () => {
+        const grid = setup({
+            ...two(),
+            // nothing lifts it: the row it lands on shows the offset
+            compactor: noCompactor,
+            engine: {
+                onExternalDrag: () => ({
+                    w: 2,
+                    h: 1,
+                    dragOffset: { x: 0, y: 60 },
+                }),
+            },
+        });
+        // the pointer a row above where the item goes
+        const [x, y] = centre(grid, 6, 1, 2, 1);
+        nativeDrag(grid.root, "dragenter", x, y - 60);
+        flush();
+        expect(grid.view().gesture?.placeholder).toEqual(
+            itemPixels(grid.view().geometry ?? ({} as never), {
+                x: 6,
+                y: 1,
+                w: 2,
+                h: 1,
+            }),
+        );
+        nativeDrag(grid.root, "dragleave", 1300, 20);
+    });
+});

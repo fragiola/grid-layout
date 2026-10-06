@@ -604,6 +604,7 @@ export function createGridLayoutEngine(
             external: current.kind === "drop",
             data: current.data,
             outside: current.outside,
+            refused: current.refused,
             target: ended?.target ?? null,
             origin: current.origin,
         };
@@ -1650,7 +1651,11 @@ export function createGridLayoutEngine(
         event: DragEvent,
         answer: Exclude<ExternalDragAnswer, false | undefined>,
     ): void {
-        const drop = { item: dropItemOf(answer), data: answer.data };
+        const drop = {
+            item: dropItemOf(answer),
+            data: answer.data,
+            dragOffset: answer.dragOffset,
+        };
         const current = begin("drop", "native", dropped(drop, { x: 0, y: 0 }), {
             drop,
         });

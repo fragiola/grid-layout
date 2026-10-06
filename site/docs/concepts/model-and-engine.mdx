@@ -61,7 +61,8 @@ command, or none.
 
 `engine.get("gesture")` reads the gesture in progress, `engine.get("cell-at", { clientX, clientY })`
 the cell under a point, and `engine.run("cancel-gesture")` ends one. `useGridLayoutEvents` hears
-each step of a gesture, for callbacks and announcements.
+each step of a gesture, for callbacks and announcements; its end says `outside` (released off the
+grid) and `refused` (the model refused the landing: the item went back, no command ran).
 
 <Example id="messy-layout" />
 
