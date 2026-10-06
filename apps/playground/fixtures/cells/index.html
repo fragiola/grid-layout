@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Grid cells fixture</title>
+        <style>
+            /* the fixture's own few lines: a page to read, and cells to see */
+            body { margin: 0; padding: 60px 80px 40px; font: 13px/1.2 system-ui, sans-serif; }
+            [data-grid-layout-part="root"] { width: 960px; }
+            [data-grid-layout-part="cell"] { outline: 1px dotted #bbb; }
+            [data-grid-layout-part="item"] { outline: 1px solid #888; background: #eee; }
+            [data-grid-layout-part="placeholder"] { outline: 2px dashed #06c; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountCellsFixture } from "../../src/fixture/cells-fixture.tsx";
+            mountCellsFixture();
+        </script>
+    </body>
+</html>
