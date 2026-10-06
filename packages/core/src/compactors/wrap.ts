@@ -7,7 +7,12 @@
 // placed), so items taller or wider than one cell never overlap.
 
 import type { Compactor, Layout } from "../layout/types";
-import { fromWorking, toWorking, type WorkItem } from "../layout/working";
+import {
+    byRowThenColumn,
+    fromWorking,
+    toWorking,
+    type WorkItem,
+} from "../layout/working";
 
 /** Whether `item` fits at `x`/`y`: in the columns, on no taken cell. */
 function free(
@@ -43,7 +48,7 @@ function take(taken: Set<number>, item: WorkItem, cols: number): void {
 function flow(layout: Layout, cols: number): Layout {
     if (layout.length === 0) return layout;
     const work = toWorking(layout);
-    const sorted = [...work].sort((a, b) => a.y - b.y || a.x - b.x);
+    const sorted = [...work].sort(byRowThenColumn);
     const taken = new Set<number>();
     for (const item of sorted) if (item.static) take(taken, item, cols);
     // the next cell in reading order an item may start at

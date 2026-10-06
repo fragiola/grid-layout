@@ -1,0 +1,142 @@
+---
+title: Model API recipes
+description: Drive the grid from your app with middleware, commands from a form, an event log, undo and redo, a controlled layout and named layouts.
+---
+
+The grid's model takes commands and tells every change. That is enough to build the app policy the
+package leaves to you: rules, remote control, logs, undo, saved layouts. Each recipe below is one
+example, built on `model.use`, `model.run`, `model.check` and `model.subscribe`, and the engine's
+gesture events. See [Model and engine](/docs/concepts/model-and-engine) for the API itself.
+
+Inside the root, `useGridLayout()` gives `{ model, engine }`. Outside it, a `gridLayoutRef` does.
+
+```tsx title="dashboard.tsx"
+const gridLayoutRef = useGridLayoutRef();
+
+<Toolbar gridLayoutRef={gridLayoutRef} />
+<GridLayout.Root gridLayoutRef={gridLayoutRef} defaultLayout={layout}>…</GridLayout.Root>
+
+// in the toolbar: null until the root is mounted
+const grid = useGridLayout(gridLayoutRef);
+```
+
+## Rules as middleware
+
+A middleware sees every command, from a drag, a key or your code. Run the command with `next()`,
+read the layout it would settle into, and refuse it with `veto(reason)` when a rule breaks.
+
+```ts title="rules.ts"
+model.use((ctx, next) => {
+    if (ctx.command !== "item.move" && ctx.command !== "item.add") return next();
+    const result = next();
+    if (!result.ok) return result;
+    const { layout } = result.value as PlaceResult;
+    if (layout.some(insideReservedArea)) return veto("The reserved area stays empty.");
+    return result;
+});
+```
+
+A drag asks the model at every cell, through the same middleware (`ctx.dryRun` is `true`), so a
+refused landing shows the item going back and the drop changes nothing. Keep dry runs free of side
+effects: remember the reason in a ref, and show it when the gesture ends (its `drag-stop` says
+`refused`).
+
+<Example id="middleware" />
+
+## Commands from a form
+
+Any part of the page can run commands. Ask `model.check` first: it is a dry run that returns the
+same result, or the reason the model would refuse.
+
+```tsx title="controls.tsx"
+const check = model.check("item.move", { itemId, x, y });
+
+<button disabled={!check.ok} onClick={() => model.run("item.move", { itemId, x, y })}>
+    Move
+</button>
+{!check.ok && <p role="status">{check.error.message}</p>}
+```
+
+A static item is `refused`, a cell outside the columns is an `invalid_payload`. `model.can` answers
+the same question with a boolean.
+
+<Example id="remote-control" />
+
+## Listening to changes
+
+Two streams tell what happens. `model.subscribe` tells every committed command, whoever ran it,
+with the state before and after. `useGridLayoutEvents` tells every step of a gesture: a drag is a
+`drag-start`, its `drag` steps and a `drag-stop`, with one `item.move` committed before the stop.
+
+```tsx title="log.tsx"
+useEffect(
+    () => grid?.model.subscribe(({ command, before, after }) => log(command, before, after)),
+    [grid],
+);
+
+useGridLayoutEvents((event) => log(event.type, event.item), gridLayoutRef);
+```
+
+<Example id="event-log" />
+
+## Undo and redo
+
+The package ships no history: what counts as a step is yours. A command event holds the state
+`before` and `after` it, and states are immutable, so keeping them costs nothing. Undo runs
+`layouts.set` with `before.layouts`, redo with `after.layouts`. Skip the events your own restores
+cause.
+
+```ts title="undo.ts"
+let restoring = false;
+
+model.subscribe((event) => {
+    if (restoring || event.before.layouts === event.after.layouts) return;
+    done.push({ before: event.before.layouts, after: event.after.layouts });
+    undone = [];
+});
+
+function undo() {
+    const step = done.pop();
+    if (!step) return;
+    restoring = true;
+    model.run("layouts.set", { layouts: step.before });
+    restoring = false;
+    undone.push(step);
+}
+```
+
+Every breakpoint's layout is restored at once, so a breakpoint's generated layout is a step too.
+Undoing it while that breakpoint shows makes it again at once: the grid always has a layout for
+what it shows. The example's history (`_kit/undo.ts`) also handles a refused restore, a limit and
+the shortcuts.
+
+<Example id="undo-redo" />
+
+## A controlled layout
+
+Hold the layout in React state: `layout` gives it to the grid, `onLayoutChange` takes each
+committed change back, once per drag or resize. Set the state from anywhere and the grid follows.
+
+```tsx title="controlled.tsx"
+const [layout, setLayout] = useState(START);
+
+<button onClick={() => setLayout(START)}>Reset</button>
+<GridLayout.Root layout={layout} onLayoutChange={setLayout}>…</GridLayout.Root>
+```
+
+A change you make through the prop is not told back. A layout that had to be corrected is told
+once, settled.
+
+<Example id="controlled-layout" />
+
+## Named layouts
+
+Save `model.get("layout")` under a name, and put it back with one `layout.set`. It is checked and
+settled like any layout, and it is one committed change: `onLayoutChange` tells it.
+
+```ts title="named.ts"
+const save = (name: string) => store({ ...saved, [name]: model.get("layout") });
+const apply = (name: string) => model.run("layout.set", { layout: saved[name] });
+```
+
+<Example id="named-layouts" />

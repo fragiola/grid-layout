@@ -159,6 +159,17 @@ describe("switching breakpoints", () => {
         ).toEqual(["a", "c"]);
     });
 
+    it("keeps the size of an item added on a smaller breakpoint on a larger one (react-grid-layout#2110)", () => {
+        const model = responsive();
+        model.run("breakpoint.set", { breakpoint: "md" });
+        model.run("item.add", { item: item("n", 4, 0, 6, 3) });
+        model.run("breakpoint.set", { breakpoint: "lg" });
+        expect(model.get("item-by", { itemId: "n" })).toMatchObject({
+            w: 6,
+            h: 3,
+        });
+    });
+
     it("lets middleware see, and refuse, a generation", () => {
         const model = responsive();
         const seen: string[] = [];

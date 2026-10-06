@@ -26,7 +26,11 @@ export interface ExternalDrop {
  * item to drop and its data, `false` to refuse it, `undefined` to let it pass.
  */
 export type ExternalDragAnswer =
-    | (DropItem & { readonly data?: unknown })
+    | (DropItem & {
+          readonly data?: unknown;
+          /** where the item sits from the pointer, in pixels on screen (default: centred under it) */
+          readonly dragOffset?: ExternalDrop["dragOffset"];
+      })
     | false
     | undefined;
 
@@ -212,6 +216,11 @@ export interface GestureEvent {
     readonly data: unknown;
     /** the pointer is off the grid: a move released there runs no command */
     readonly outside: boolean;
+    /**
+     * the model refuses the landing shown (a middleware, a collision): a gesture that ends so
+     * runs no command, the item goes back
+     */
+    readonly refused: boolean;
     /** a move released off the grid: the element under the pointer (a trash); `null` otherwise */
     readonly target: Element | null;
     /** the drag source a drop started from (`undefined` for a native drag and the grid's own) */

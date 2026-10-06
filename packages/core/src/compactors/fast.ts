@@ -19,6 +19,8 @@ const staticsFirst = (a: WorkItem, b: WorkItem) =>
 function riseFast(layout: Layout, cols: number, overlap: boolean): Layout {
     const work = toWorking(layout);
     const sorted = [...work].sort(
+        // the reading order written out: a sort's comparator stays in this module (a call to
+        // another one costs, here more than anywhere)
         (a, b) => a.y - b.y || a.x - b.x || staticsFirst(a, b),
     );
     const tide = new Array<number>(Math.max(cols, 0)).fill(0);

@@ -8,8 +8,8 @@
 // says why (`invalid`) instead of throwing, and what the constraints give is kept inside the
 // columns afterwards: a committed layout is always valid.
 
-import { columnWidth, type GridGeometry } from "./geometry";
-import { sideEdges } from "./resize";
+import { columnWidth, type GridGeometry, pixelSpan, unitsAt } from "./geometry";
+import { anchor, roomFor, sideEdges } from "./resize";
 import type {
     GridRect,
     Layout,
@@ -104,20 +104,6 @@ function visibleRows(ctx: ConstraintContext): number {
     );
 }
 
-/** The largest width and height `item` may take from `side`, its opposite edges staying put. */
-function room(
-    item: LayoutItem,
-    side: ResizeSide,
-    cols: number,
-    rows: number,
-): { w: number; h: number } {
-    const { inline, block } = sideEdges(side);
-    return {
-        w: inline === "start" ? item.x + item.w : cols - item.x,
-        h: block === "top" ? item.y + item.h : rows - item.y,
-    };
-}
-
 /** A box kept inside `cols` columns and `rows` rows. */
 function bounded(item: LayoutItem, cols: number, rows: number) {
     return {
@@ -133,7 +119,7 @@ function sizedWithin(
     cols: number,
     rows: number,
 ) {
-    const max = room(item, side, cols, rows);
+    const max = roomFor(item, sideEdges(side), cols, rows);
     return {
         w: clamp(item.w, 1, Math.max(1, max.w)),
         h: clamp(item.h, 1, Math.max(1, max.h)),
@@ -147,13 +133,18 @@ export const gridBounds: LayoutConstraint = {
     size: (item, ctx, side) => sizedWithin(item, side, ctx.cols, ctx.maxRows),
 };
 
+/** @internal `item`'s size within its own `minW`/`maxW`/`minH`/`maxH` (minimums default to 1). */
+export function withinLimits(item: LayoutItem): { w: number; h: number } {
+    return {
+        w: clamp(item.w, item.minW ?? 1, item.maxW ?? Number.POSITIVE_INFINITY),
+        h: clamp(item.h, item.minH ?? 1, item.maxH ?? Number.POSITIVE_INFINITY),
+    };
+}
+
 /** Sizes stay within each item's `minW`/`maxW`/`minH`/`maxH` (minimums default to 1): a default. */
 export const minMaxSize: LayoutConstraint = {
     name: "minMaxSize",
-    size: (item) => ({
-        w: clamp(item.w, item.minW ?? 1, item.maxW ?? Number.POSITIVE_INFINITY),
-        h: clamp(item.h, item.minH ?? 1, item.maxH ?? Number.POSITIVE_INFINITY),
-    }),
+    size: withinLimits,
 };
 
 /** The constraints a grid has unless it names its own: {@link gridBounds}, then {@link minMaxSize}. */
@@ -212,17 +203,12 @@ export function aspectRatio(ratio: number): LayoutConstraint {
         size: (item, ctx) => {
             const { geometry } = ctx;
             if (!geometry) return { w: item.w, h: item.h };
-            const [gapX, gapY] = geometry.gap;
-            const width =
-                columnWidth(geometry) * item.w + gapX * Math.max(0, item.w - 1);
-            const height = width / ratio;
-            return {
-                w: item.w,
-                h: Math.max(
-                    1,
-                    Math.round((height + gapY) / (geometry.rowHeight + gapY)),
-                ),
-            };
+            const width = pixelSpan(
+                item.w,
+                columnWidth(geometry),
+                geometry.gap[0],
+            );
+            return { w: item.w, h: unitsAt(geometry, width, width / ratio).h };
         },
     };
 }
@@ -451,24 +437,14 @@ function anchored(
     h: number,
     cols: number,
 ): GridRect {
-    const { inline, block } = sideEdges(side);
-    const end = rect.x + rect.w;
-    const bottom = rect.y + rect.h;
-    const width = clamp(
-        Math.round(w),
-        1,
-        Math.max(1, inline === "start" ? end : cols - rect.x),
+    const edges = sideEdges(side);
+    const room = roomFor(rect, edges, cols, Number.POSITIVE_INFINITY);
+    return anchor(
+        rect,
+        edges,
+        clamp(Math.round(w), 1, Math.max(1, room.w)),
+        Math.max(1, Math.min(Math.round(h), room.h)),
     );
-    const height = Math.max(
-        1,
-        block === "top" ? Math.min(Math.round(h), bottom) : Math.round(h),
-    );
-    return {
-        x: inline === "start" ? end - width : rect.x,
-        y: block === "top" ? bottom - height : rect.y,
-        w: width,
-        h: height,
-    };
 }
 
 /**

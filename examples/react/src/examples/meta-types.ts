@@ -19,6 +19,7 @@ export const CATEGORIES = [
     "responsive",
     "mobile",
     "styling",
+    "model-api",
     "apps",
 ] as const;
 
@@ -36,6 +37,7 @@ export const CATEGORY_TITLES: Record<Category, string> = {
     responsive: "Responsive",
     mobile: "Mobile",
     styling: "Styling",
+    "model-api": "Model API",
     apps: "Apps",
 };
 
@@ -78,5 +80,6 @@ export const DEFAULT_HEIGHT: Record<Category, number> = {
     responsive: 560,
     mobile: 720,
     styling: 480,
+    "model-api": 560,
     apps: 600,
 };

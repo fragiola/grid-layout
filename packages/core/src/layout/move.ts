@@ -7,23 +7,30 @@
 
 import { collisions, firstCollision } from "./collision";
 import type { CompactType } from "./types";
-import type { WorkItem } from "./working";
+import { byColumnThenRow, byRowThenColumn, type WorkItem } from "./working";
 
-/** @internal How one move resolves its collisions. */
-export interface MoveOptions {
+/** How one move resolves its collisions. */
+interface MoveOptions {
     readonly compactType: CompactType;
     readonly preventCollision: boolean;
     readonly allowOverlap: boolean;
 }
 
-function sortedFor(layout: readonly WorkItem[], type: CompactType): WorkItem[] {
-    const sorted = [...layout];
-    if (type === "horizontal") {
-        sorted.sort((a, b) => a.x - b.x || a.y - b.y);
-    } else if (type === "vertical") {
-        sorted.sort((a, b) => a.y - b.y || a.x - b.x);
+/**
+ * What `item` collides with in `layout`, in the order a move meets them: by row (by column with
+ * horizontal compaction), the layout's order among equals. Only the hits are sorted, not the
+ * layout: the same order, without sorting every item on each push.
+ */
+function hitsInOrder(
+    layout: readonly WorkItem[],
+    item: WorkItem,
+    type: CompactType,
+): WorkItem[] {
+    const hits = collisions(layout, item);
+    if (type !== "none") {
+        hits.sort(type === "horizontal" ? byColumnThenRow : byRowThenColumn);
     }
-    return sorted;
+    return hits;
 }
 
 /**
@@ -60,17 +67,16 @@ export function moveWorking(
     item.moved = true;
 
     // Collisions in the order they would be met: moving up (or toward the start) meets the
-    // lower items last, so the sort is reversed.
-    let sorted = sortedFor(layout, options.compactType);
+    // lower items last, so the order is reversed.
+    const hits = hitsInOrder(layout, item, options.compactType);
     const movingBack =
         options.compactType === "vertical"
             ? oldY >= nextY
             : options.compactType === "horizontal"
               ? oldX >= nextX
               : false;
-    if (movingBack) sorted = sorted.reverse();
+    if (movingBack) hits.reverse();
 
-    const hits = collisions(sorted, item);
     if (hits.length > 0 && options.allowOverlap) return true;
     if (hits.length > 0 && options.preventCollision) {
         item.x = oldX;
@@ -199,10 +205,7 @@ export function pushAside(
     if (options.allowOverlap) return;
     item.moved = true;
     const horizontal = options.compactType === "horizontal";
-    for (const hit of collisions(
-        sortedFor(layout, options.compactType),
-        item,
-    )) {
+    for (const hit of hitsInOrder(layout, item, options.compactType)) {
         if (hit.moved || hit.static) continue;
         moveWorking(
             layout,

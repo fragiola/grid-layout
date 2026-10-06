@@ -120,6 +120,10 @@
                 {
                     "label": "A grid background",
                     "path": "guides/grid-background"
+                },
+                {
+                    "label": "Model API recipes",
+                    "path": "guides/model-api-recipes"
                 }
             ]
         },

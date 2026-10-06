@@ -154,7 +154,7 @@ describe("a drop from a drag source, by pointer", () => {
         expect(grid.events).toHaveLength(0);
     });
 
-    it("removes the preview off the grid, and drops nothing there", () => {
+    it("removes the preview off the grid, and drops nothing there (react-grid-layout#2262)", () => {
         const grid = setup(two());
         const told = changes(grid);
         const start = grid.model.get("layout");
@@ -196,7 +196,7 @@ describe("a drop from a drag source, by pointer", () => {
         expect(grid.view().gesture).toBeUndefined();
     });
 
-    it("places the item centred under the pointer, moved by the drag offset, mirrored in rtl", () => {
+    it("places the item centred under the pointer, moved by the drag offset, mirrored in rtl (react-grid-layout#2148)", () => {
         for (const dir of ["ltr", "rtl"] as const) {
             const grid = setup({ ...two(), dir, compactor: noCompactor });
             const source = grid.source({
@@ -212,6 +212,26 @@ describe("a drop from a drag source, by pointer", () => {
                 y: 1,
             });
         }
+    });
+
+    it("drops where the pointer is on a grid scrolled out of the top of the view (react-grid-layout#2143)", () => {
+        const grid = setup({
+            layout: [item("tall", 0, 0, 1, 20)],
+            compactor: noCompactor,
+        });
+        // the page (or a scrolling ancestor) scrolled 600px: the root's top is above the view
+        const height = grid.view().height;
+        grid.root.getBoundingClientRect = () =>
+            new DOMRect(0, -600, 1200, height);
+        const source = grid.source({ item: { w: 2, h: 1 } });
+        const [x, y] = centre(grid, 4, 12, 2, 1);
+        const press = pointer(source, 1300, 20);
+        press.move(x, y - 600);
+        expect(
+            grid.view().gesture?.preview.find((entry) => entry.id !== "tall"),
+        ).toMatchObject({ x: 4, y: 12 });
+        press.release(x, y - 600);
+        expect(grid.events.at(-1)?.item).toMatchObject({ x: 4, y: 12 });
     });
 
     it("keeps a bounded drop inside the grid", () => {
@@ -829,5 +849,35 @@ describe("listeners", () => {
         grid.detach();
         expect(live()).toBe(0);
         expect(grid.model.get("layout")).toHaveLength(2);
+    });
+});
+
+describe("a native drag's offset", () => {
+    it("places the item away from the pointer by the answer's `dragOffset`, as a source's", () => {
+        const grid = setup({
+            ...two(),
+            // nothing lifts it: the row it lands on shows the offset
+            compactor: noCompactor,
+            engine: {
+                onExternalDrag: () => ({
+                    w: 2,
+                    h: 1,
+                    dragOffset: { x: 0, y: 60 },
+                }),
+            },
+        });
+        // the pointer a row above where the item goes
+        const [x, y] = centre(grid, 6, 1, 2, 1);
+        nativeDrag(grid.root, "dragenter", x, y - 60);
+        flush();
+        expect(grid.view().gesture?.placeholder).toEqual(
+            itemPixels(grid.view().geometry ?? ({} as never), {
+                x: 6,
+                y: 1,
+                w: 2,
+                h: 1,
+            }),
+        );
+        nativeDrag(grid.root, "dragleave", 1300, 20);
     });
 });

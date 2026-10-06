@@ -106,7 +106,8 @@ be read.
 
 It returns the item to drop and its `data`, `false` to refuse the drag (the root gets
 `data-drop-refused`), or `undefined` to let it pass. The answer on the drop can still refuse, and
-gives the drop's data. The size stays the one shown.
+gives the drop's data. The size stays the one shown. A `dragOffset` (`{ x, y }`, pixels on screen)
+places the item away from the pointer, as a drag source's does.
 
 <Example id="drop-files" />
 

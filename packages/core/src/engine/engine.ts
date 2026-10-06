@@ -28,6 +28,7 @@ import {
 import { resizeRect, sideEdges } from "../layout/resize";
 import { valueAt } from "../layout/responsive";
 import type { GridRect, Layout, LayoutItem, ResizeSide } from "../layout/types";
+import { sameRect } from "../layout/working";
 import { rulesOf } from "../model/model";
 import type { GridLayoutModel } from "../model/types";
 import { DRAG_EXEMPT, PART_ATTRIBUTE, PRESSING_ATTRIBUTE } from "./dom";
@@ -164,6 +165,8 @@ interface Session {
     scrolling: number | undefined;
     /** what scrolls each way, found once the gesture first nears an edge (`null`: nothing) */
     scrollers: { x: Element | null; y: Element | null } | undefined;
+    /** a resize: the smallest and largest boxes it can land at, found at its first frame */
+    limits: { least: PixelRect; most: PixelRect } | undefined;
     /** a touch holds the item: the page must not scroll under it */
     touch: boolean;
     /** removes what the session listens to */
@@ -199,6 +202,9 @@ interface Preview {
  */
 const SETTLE = 24;
 
+/** Rows past any a pointer reaches: a resize's largest ask, bounded only by its constraints. */
+const UNBOUNDED_ROWS = 100_000;
+
 /** The gap and the row height a grid takes by default. */
 const DEFAULT_GAP: readonly [number, number] = [10, 10];
 const DEFAULT_ROW_HEIGHT = 150;
@@ -215,10 +221,6 @@ const ARROWS: Record<string, readonly [number, number]> = {
     ArrowUp: [0, -1],
     ArrowDown: [0, 1],
 };
-
-function sameRect(a: GridRect, b: GridRect): boolean {
-    return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-}
 
 /** Whether two layouts put the same items in the same boxes, in the same order. */
 function samePlaces(a: Layout, b: Layout): boolean {
@@ -242,6 +244,10 @@ const rectOf = (item: GridRect): GridRect => ({
     w: item.w,
     h: item.h,
 });
+
+/** An overflow that scrolls (or will, once its content grows). */
+const scrolls = (overflow: string | undefined) =>
+    overflow === "auto" || overflow === "scroll" || overflow === "overlay";
 
 /** A key that grabs: Space or Enter, without a modifier, and not a held key's repeat. */
 const grabs = (event: KeyboardEvent) =>
@@ -604,6 +610,7 @@ export function createGridLayoutEngine(
             external: current.kind === "drop",
             data: current.data,
             outside: current.outside,
+            refused: current.refused,
             target: ended?.target ?? null,
             origin: current.origin,
         };
@@ -712,19 +719,19 @@ export function createGridLayoutEngine(
 
     /** Shows `next`: a new view only when what it shows changed. */
     function show(current: Session, next: Preview, outside: boolean): void {
-        const geometry = geometryOf();
         // the command asks for what this preview was asked for (the same places either way)
         current.asked = next.asked;
         // a dry run gives new objects: the same places show nothing new (no render)
         if (
-            !geometry ||
-            (samePlaces(next.layout, current.preview) &&
-                sameRect(next.landed, current.landed) &&
-                next.refused === current.refused &&
-                outside === current.outside)
+            samePlaces(next.layout, current.preview) &&
+            sameRect(next.landed, current.landed) &&
+            next.refused === current.refused &&
+            outside === current.outside
         ) {
             return;
         }
+        const geometry = geometryOf();
+        if (!geometry) return;
         current.preview = next.layout;
         current.landed = next.landed;
         current.refused = next.refused;
@@ -819,6 +826,7 @@ export function createGridLayoutEngine(
             last: undefined,
             scrolling: undefined,
             scrollers: undefined,
+            limits: undefined,
             touch: false,
             cleanup: [],
         };
@@ -996,6 +1004,33 @@ export function createGridLayoutEngine(
         };
     }
 
+    /**
+     * The smallest and largest boxes a resize can land at, in pixels: what the model's own
+     * constraints give the extreme sizes (its limits, `maxRows`, an item's own constraints), the
+     * fixed edges kept. Asked once per gesture; the frames only clamp to them.
+     */
+    function drawLimits(
+        current: Session,
+        geometry: GridGeometry,
+    ): { least: PixelRect; most: PixelRect } {
+        const rules = rulesOf(model.state);
+        const side = current.side ?? "bottom-end";
+        const at = (w: number, h: number) =>
+            itemPixels(
+                geometry,
+                constrainResize(
+                    current.before,
+                    side,
+                    { w, h },
+                    rules,
+                    current.start,
+                    current.env,
+                ),
+            );
+        // as far as a pointer can pull: every column, and rows past any reach
+        return { least: at(1, 1), most: at(rules.cols, UNBOUNDED_ROWS) };
+    }
+
     /** Applies the last pointer position: the item drawn at it, and the preview retargeted. */
     function frame(current: Session): void {
         current.frame = undefined;
@@ -1037,7 +1072,8 @@ export function createGridLayoutEngine(
             // a bounded item never leaves the grid; off it, an unbounded one goes back
             outside = !settings.bounded && offGrid(at, box);
         } else {
-            const { inline, block } = sideEdges(current.side ?? "bottom-end");
+            const edges = sideEdges(current.side ?? "bottom-end");
+            const { inline, block } = edges;
             const dx = point.x - current.grab.x - start.left;
             const dy = point.y - current.grab.y - start.top;
             let { left, top, width, height } = start;
@@ -1051,6 +1087,21 @@ export function createGridLayoutEngine(
                 height = start.height - dy;
                 top = start.top + dy;
             }
+            // drawn no smaller or larger than it can land (react-grid-layout#2235)
+            current.limits ??= drawLimits(current, geometry);
+            const { least, most } = current.limits;
+            const drawnWidth = Math.max(
+                least.width,
+                Math.min(width, most.width),
+            );
+            const drawnHeight = Math.max(
+                least.height,
+                Math.min(height, most.height),
+            );
+            if (inline === "start") left += width - drawnWidth;
+            if (block === "top") top += height - drawnHeight;
+            width = drawnWidth;
+            height = drawnHeight;
             if (current.element) {
                 place(current.element, {
                     left,
@@ -1080,29 +1131,29 @@ export function createGridLayoutEngine(
     // ─── edge auto-scroll ───────────────────────────────────────────────────────────────────
 
     /**
-     * The nearest ancestor of the root (or the root) that scrolls along an axis, else the page's
-     * scroller (`null` without one). Found once a gesture nears an edge, not every frame.
+     * The nearest ancestor of the root (or the root) that scrolls along each axis, else the
+     * page's scroller (`null` without one). Found once a gesture, not every frame, in one walk:
+     * one style read per ancestor for both axes.
      */
-    function scrollerOf(start: HTMLElement, axis: "x" | "y"): Element | null {
+    function scrollersOf(start: HTMLElement): {
+        x: Element | null;
+        y: Element | null;
+    } {
         const host = start.ownerDocument.defaultView;
         const page = start.ownerDocument.scrollingElement;
+        let x: Element | undefined;
+        let y: Element | undefined;
         for (
             let element: HTMLElement | null = start;
-            element && element !== page;
+            element && element !== page && !(x && y);
             element = element.parentElement
         ) {
             const style = host?.getComputedStyle(element);
-            const overflow = axis === "y" ? style?.overflowY : style?.overflowX;
             // by its style, room or not yet: a grid growing under a gesture makes room
-            if (
-                overflow === "auto" ||
-                overflow === "scroll" ||
-                overflow === "overlay"
-            ) {
-                return element;
-            }
+            if (!x && scrolls(style?.overflowX)) x = element;
+            if (!y && scrolls(style?.overflowY)) y = element;
         }
-        return page;
+        return { x: x ?? page, y: y ?? page };
     }
 
     /**
@@ -1228,10 +1279,7 @@ export function createGridLayoutEngine(
         ) {
             return;
         }
-        current.scrollers ??= {
-            x: scrollerOf(root, "x"),
-            y: scrollerOf(root, "y"),
-        };
+        current.scrollers ??= scrollersOf(root);
         if (axisStep(current, "x") === 0 && axisStep(current, "y") === 0)
             return;
         current.scrolling = host.requestAnimationFrame(() => {
@@ -1650,7 +1698,11 @@ export function createGridLayoutEngine(
         event: DragEvent,
         answer: Exclude<ExternalDragAnswer, false | undefined>,
     ): void {
-        const drop = { item: dropItemOf(answer), data: answer.data };
+        const drop = {
+            item: dropItemOf(answer),
+            data: answer.data,
+            dragOffset: answer.dragOffset,
+        };
         const current = begin("drop", "native", dropped(drop, { x: 0, y: 0 }), {
             drop,
         });
@@ -1928,69 +1980,71 @@ export function createGridLayoutEngine(
         return true;
     }
 
+    // what `get`, `run` and `is` answer, made once (not on every call)
+    const queries: {
+        [K in keyof EngineQueryMap]: (
+            payload: EngineQueryMap[K]["payload"],
+        ) => EngineQueryMap[K]["result"];
+    } = {
+        gesture: () => session?.view,
+        "item-rect-by": ({ itemId }) => view.rects[itemId],
+        "cell-at": ({ clientX, clientY }) => {
+            const geometry = geometryOf();
+            if (!geometry) return undefined;
+            // a zoom on an ancestor resizes nothing: the scale is read again (K5)
+            if (!session) readScale();
+            const point = pointIn(clientX, clientY);
+            // the cell whose box (with the gap after it) holds the point
+            const x = Math.floor(
+                (point.x - geometry.padding[0]) /
+                    (columnWidth(geometry) + geometry.gap[0]),
+            );
+            const y = Math.floor(
+                (point.y - geometry.padding[1]) /
+                    (geometry.rowHeight + geometry.gap[1]),
+            );
+            return {
+                x: Math.max(0, Math.min(x, geometry.cols - 1)),
+                y: Math.max(0, y),
+            };
+        },
+        geometry: () => geometryOf(),
+        dir: () => dir,
+        cells: ({ rows }) =>
+            view.geometry
+                ? gridCells(view.geometry, cellRowCount(view, rows))
+                : [],
+    };
+    const actions: {
+        [K in keyof EngineActionMap]: (
+            payload: EngineActionMap[K]["payload"],
+        ) => EngineActionMap[K]["result"];
+    } = {
+        "cancel-gesture": () => cancel(undefined),
+        "focus-item": ({ itemId }) => focusItem(itemId),
+    };
+    const questions: {
+        [K in keyof EngineQuestionMap]: (
+            payload: EngineQuestionMap[K],
+        ) => boolean;
+    } = {
+        "item-active-by": ({ itemId }) => session?.itemId === itemId,
+    };
+
     const engine: GridLayoutEngine = {
         get(key, ...[payload]) {
-            const queries: {
-                [K in keyof EngineQueryMap]: (
-                    payload: EngineQueryMap[K]["payload"],
-                ) => EngineQueryMap[K]["result"];
-            } = {
-                gesture: () => session?.view,
-                "item-rect-by": ({ itemId }) => view.rects[itemId],
-                "cell-at": ({ clientX, clientY }) => {
-                    const geometry = geometryOf();
-                    if (!geometry) return undefined;
-                    // a zoom on an ancestor resizes nothing: the scale is read again (K5)
-                    if (!session) readScale();
-                    const point = pointIn(clientX, clientY);
-                    // the cell whose box (with the gap after it) holds the point
-                    const x = Math.floor(
-                        (point.x - geometry.padding[0]) /
-                            (columnWidth(geometry) + geometry.gap[0]),
-                    );
-                    const y = Math.floor(
-                        (point.y - geometry.padding[1]) /
-                            (geometry.rowHeight + geometry.gap[1]),
-                    );
-                    return {
-                        x: Math.max(0, Math.min(x, geometry.cols - 1)),
-                        y: Math.max(0, y),
-                    };
-                },
-                geometry: () => geometryOf(),
-                dir: () => dir,
-                cells: ({ rows }) =>
-                    view.geometry
-                        ? gridCells(view.geometry, cellRowCount(view, rows))
-                        : [],
-            };
             const query = queries[key] as (
                 payload: unknown,
             ) => EngineQueryMap[typeof key]["result"];
             return query(payload);
         },
         run(action, ...[payload]) {
-            const actions: {
-                [K in keyof EngineActionMap]: (
-                    payload: EngineActionMap[K]["payload"],
-                ) => EngineActionMap[K]["result"];
-            } = {
-                "cancel-gesture": () => cancel(undefined),
-                "focus-item": ({ itemId }) => focusItem(itemId),
-            };
             const run = actions[action] as (
                 payload: unknown,
             ) => EngineActionMap[typeof action]["result"];
             return run(payload);
         },
         is(key, payload) {
-            const questions: {
-                [K in keyof EngineQuestionMap]: (
-                    payload: EngineQuestionMap[K],
-                ) => boolean;
-            } = {
-                "item-active-by": ({ itemId }) => session?.itemId === itemId,
-            };
             return questions[key](payload);
         },
         subscribe(listener) {

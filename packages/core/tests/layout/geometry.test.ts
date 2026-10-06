@@ -60,7 +60,7 @@ describe("an item's pixels", () => {
         [0, 1200, 12],
         [7, 1003, 9],
     ] as const) {
-        it(`keeps every gap exactly ${gap}px (react-grid-layout PR #2150)`, () => {
+        it(`keeps every gap exactly ${gap}px, none at 0 (react-grid-layout#2141, PR #2150)`, () => {
             const geometry: GridGeometry = {
                 width,
                 cols,

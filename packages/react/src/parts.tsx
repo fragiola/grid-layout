@@ -15,7 +15,7 @@ import type {
     ResizeSide,
 } from "@fragiola/grid-layout";
 import { Fragment, type ReactNode } from "react";
-import { ItemContext } from "./context";
+import { ItemContext, useViewContext } from "./context";
 import type { GridLayoutRef } from "./gridLayoutRef";
 import {
     type CellHookResult,
@@ -24,9 +24,7 @@ import {
     useDragHandle,
     useDragPreview,
     useDragSource,
-    useGridLayoutView,
     useItem,
-    useItems,
     usePlaceholder,
     useResizeHandle,
 } from "./hooks";
@@ -48,10 +46,9 @@ export interface ItemsProps {
  * never animates it in from the corner.
  */
 export function Items({ children }: ItemsProps) {
-    const view = useGridLayoutView();
-    const items = useItems();
+    const view = useViewContext("Items");
     if (!view.geometry) return null;
-    return items.map((item) => (
+    return view.layout.map((item) => (
         <Fragment key={item.id}>{children(item)}</Fragment>
     ));
 }

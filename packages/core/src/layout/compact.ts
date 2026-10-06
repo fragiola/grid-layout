@@ -6,12 +6,14 @@
 // They run on a working copy: no input is mutated. `noCompactor` closes no gap, but pushes down
 // what overlaps, so a settled layout never overlaps (React Grid Layout's leaves it as it is).
 
-import { bottom, collides, firstCollision } from "./collision";
-import type { Compactor, Layout } from "./types";
-import { fromWorking, toWorking, type WorkItem } from "./working";
-
-const byRowThenColumn = (a: WorkItem, b: WorkItem) => a.y - b.y || a.x - b.x;
-const byColumnThenRow = (a: WorkItem, b: WorkItem) => a.x - b.x || a.y - b.y;
+import { collides, firstCollision } from "./collision";
+import type { Compactor } from "./types";
+import {
+    byColumnThenRow,
+    byRowThenColumn,
+    settleEach,
+    type WorkItem,
+} from "./working";
 
 /**
  * Moves `item` to `to` on `axis`, first pushing every later item of `sorted` it would land on
@@ -40,42 +42,17 @@ function resolveCollision(
     item[axis] = to;
 }
 
-function compactWith(
-    layout: Layout,
-    cols: number,
-    order: (a: WorkItem, b: WorkItem) => number,
-    settle: (
-        placed: WorkItem[],
-        item: WorkItem,
-        sorted: readonly WorkItem[],
-        context: { cols: number; maxY: number; hasStatics: boolean },
-    ) => void,
-): Layout {
-    const work = toWorking(layout);
-    const placed = work.filter((item) => item.static);
-    const hasStatics = placed.length > 0;
-    const sorted = [...work].sort(order);
-    const context = { cols, maxY: bottom(placed), hasStatics };
-    for (const item of sorted) {
-        if (item.static) continue;
-        settle(placed, item, sorted, context);
-        context.maxY = Math.max(context.maxY, item.y + item.h);
-        placed.push(item);
-    }
-    return fromWorking(work);
-}
-
 /** Items rise as far as they can, in reading order: the default. */
 export const verticalCompactor: Compactor = {
     type: "vertical",
     compact: (layout, cols) =>
-        compactWith(
+        settleEach(
             layout,
             cols,
             byRowThenColumn,
-            (placed, item, sorted, c) => {
+            (item, { placed, maxY, hasStatics }, sorted) => {
                 item.x = Math.max(item.x, 0);
-                item.y = Math.min(Math.max(item.y, 0), c.maxY);
+                item.y = Math.min(Math.max(item.y, 0), maxY);
                 while (
                     item.y > 0 &&
                     firstCollision(placed, item) === undefined
@@ -92,7 +69,7 @@ export const verticalCompactor: Compactor = {
                         item,
                         hit.y + hit.h,
                         "y",
-                        c.hasStatics,
+                        hasStatics,
                     );
                 }
                 item.y = Math.max(item.y, 0);
@@ -104,11 +81,11 @@ export const verticalCompactor: Compactor = {
 export const horizontalCompactor: Compactor = {
     type: "horizontal",
     compact: (layout, cols) =>
-        compactWith(
+        settleEach(
             layout,
             cols,
             byColumnThenRow,
-            (placed, item, sorted, c) => {
+            (item, { placed, hasStatics }, sorted) => {
                 item.x = Math.max(item.x, 0);
                 item.y = Math.max(item.y, 0);
                 while (
@@ -127,11 +104,11 @@ export const horizontalCompactor: Compactor = {
                         item,
                         hit.x + hit.w,
                         "x",
-                        c.hasStatics,
+                        hasStatics,
                     );
-                    if (item.x + item.w > c.cols) {
+                    if (item.x + item.w > cols) {
                         // past the last column: the next row, as far toward the start as it goes
-                        item.x = c.cols - item.w;
+                        item.x = cols - item.w;
                         item.y++;
                         while (
                             item.x > 0 &&
@@ -150,7 +127,7 @@ export const horizontalCompactor: Compactor = {
 export const noCompactor: Compactor = {
     type: "none",
     compact: (layout, cols) =>
-        compactWith(layout, cols, byRowThenColumn, (placed, item) => {
+        settleEach(layout, cols, byRowThenColumn, (item, { placed }) => {
             item.x = Math.max(item.x, 0);
             item.y = Math.max(item.y, 0);
             for (
