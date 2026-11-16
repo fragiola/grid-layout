@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
     type ExamplesApp,
     examplesApp,
+    existingApps,
 } from "../../examples/shared/scripts/examples-lib.ts";
 import type { Framework } from "../../examples/shared/src/framework.ts";
 import { validateExport } from "../contract.ts";
@@ -51,7 +52,10 @@ const appOf = (vue: ExamplesApp) => (framework: Framework) =>
 
 describe("the frameworks of project.json", () => {
     it("are known frameworks; an unknown one throws", () => {
-        expect(frameworksOf(readProject())).toEqual(["react"]);
+        // every framework the site ships has its examples app, and every app is shipped
+        expect(frameworksOf(readProject())).toEqual(
+            existingApps().map((app) => app.framework),
+        );
         expect(frameworksOf({ frameworks: ["react", "vue"] })).toEqual([
             "react",
             "vue",
