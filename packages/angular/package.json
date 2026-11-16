@@ -1,0 +1,77 @@
+{
+    "name": "@fragiola/grid-layout-angular",
+    "version": "0.0.0",
+    "description": "Composable, unstyled Angular directives for @fragiola/grid-layout: draggable, resizable grid layouts styled entirely by you.",
+    "keywords": [
+        "angular",
+        "grid",
+        "layout",
+        "dashboard",
+        "draggable",
+        "resizable",
+        "headless",
+        "drag-and-drop"
+    ],
+    "license": "MIT",
+    "type": "module",
+    "author": {
+        "name": "Mauro de Souza",
+        "email": "maurodesouza.me@gmail.com",
+        "url": "https://github.com/maurodesouza"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fragiola/grid-layout.git",
+        "directory": "packages/angular"
+    },
+    "homepage": "https://fragiola.com/grid-layout",
+    "bugs": {
+        "url": "https://github.com/fragiola/grid-layout/issues"
+    },
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "@fragiola/source": "./src/public-api.ts",
+            "types": "./dist/types/fragiola-grid-layout-angular.d.ts",
+            "default": "./dist/fesm2022/fragiola-grid-layout-angular.mjs"
+        },
+        "./compactors": {
+            "@fragiola/source": "./src/compactors/index.ts",
+            "types": "./dist/types/fragiola-grid-layout-angular-compactors.d.ts",
+            "default": "./dist/fesm2022/fragiola-grid-layout-angular-compactors.mjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "publishConfig": {
+        "directory": "dist",
+        "linkDirectory": false
+    },
+    "scripts": {
+        "build": "ng-packagr -p ng-package.json -c tsconfig.build.json && node scripts/publish-manifest.ts",
+        "typecheck": "ngc -p tsconfig.json",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@fragiola/grid-layout": "workspace:*"
+    },
+    "peerDependencies": {
+        "@angular/core": "^22.0.0"
+    },
+    "devDependencies": {
+        "@analogjs/vite-plugin-angular": "2.9.6",
+        "@analogjs/vitest-angular": "2.9.6",
+        "@angular/build": "22.2.6",
+        "@angular/common": "22.2.5",
+        "@angular/compiler": "22.2.5",
+        "@angular/compiler-cli": "22.2.5",
+        "@angular/core": "22.2.5",
+        "@angular/platform-browser": "22.2.5",
+        "@testing-library/jest-dom": "7.0.1",
+        "jsdom": "30.1.1",
+        "ng-packagr": "22.2.6",
+        "rxjs": "7.8.2",
+        "typescript": "6.0.3",
+        "vite": "8.3.1",
+        "vitest": "5.0.2"
+    }
+}
