@@ -1,5 +1,5 @@
-// The shape of an example's meta.ts. Site-internal: examples never import this
-// from their code, only their meta.ts does. The fields map onto an entry of the
+// The shape of an example's metadata (src/meta/<slug>.ts, shared by every framework). Site-internal:
+// examples never import this from their code, only their metadata does. The fields map onto an entry of the
 // site export's manifest.json (scripts/manifest.ts).
 //
 // The gallery groups examples by category: the feature they show. The site export contract (v1.2)

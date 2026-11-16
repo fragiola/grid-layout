@@ -6,17 +6,22 @@ rendered alone by this app at `index.html?id=<folder>`.
 ```
 src/examples/
   <slug>/index.tsx     the example (default export, "use client")
-  <slug>/meta.ts       title, description, category, order, features, docs link, layout, height
   <slug>/styles.ts     how it looks: one class string (or state function) per part
   <slug>/*.ts(x)       optional sibling files, shown in the code panel
   _kit/                shared demo content and app logic (widget content, layout generators,
                        storage, announcements); no GridLayout assembly, no styles
-  _themes/             the five themes (one CSS file each, values only) and their list
 ```
+
+What every framework's examples share and no reader copies lives once in `examples/shared`
+(`examples-shared`, imports no framework): each example's metadata (`src/meta/<slug>.ts`: title,
+description, category, order, features, docs link, layout, height), the five themes
+(`src/themes/`: one CSS file each, values only, and their list), the embed message protocol, the
+manifest builder and the loader generator (`scripts/`), and every Playwright spec (`e2e/`). An
+example keeps its id in every framework.
 
 ## Categories
 
-The gallery groups examples by the feature they show (`CATEGORIES` in `meta-types.ts`, in sidebar
+The gallery groups examples by the feature they show (`CATEGORIES` in `examples/shared/src/meta-types.ts`, in sidebar
 order; the site export contract calls a category a `level`). An example belongs where a reader
 looking for its feature would search, and `order` is its place inside the category.
 
@@ -38,14 +43,17 @@ looking for its feature would search, and `order` is its place inside the catego
 
 ## Adding an example
 
-1. Create `src/examples/<slug>/index.tsx`, `meta.ts` and `styles.ts` (see `meta-types.ts`).
+1. Create `src/examples/<slug>/index.tsx` and `styles.ts`, and its metadata in
+   `examples/shared/src/meta/<slug>.ts` (see `examples/shared/src/meta-types.ts`).
 2. `pnpm dev` at the root lists it in the playground (`apps/playground`), with hot reload, the five
    themes and its source: `http://localhost:5173/?example=<slug>`. The embed alone is
    `pnpm --filter examples-react dev` (`http://localhost:5182/?id=<slug>`, it regenerates the
    loaders).
 3. The smoke e2e visits it in the reference theme (every theme only for the representative
-   examples in `e2e/smoke.spec.ts`; `E2E_ALL_THEMES=1` runs them all), and inside an iframe. Add
-   a spec for its main behaviour in `e2e/examples/<slug>.spec.ts`.
+   examples in `examples/shared/e2e/smoke.spec.ts`; `E2E_ALL_THEMES=1` runs them all), and inside
+   an iframe. Add a spec for its main behaviour in `examples/shared/e2e/examples/<slug>.spec.ts`:
+   every framework runs it, through `data-grid-layout-part`, `data-item-id`, roles and accessible
+   names only, and skips it while that framework lacks the example.
 
 ## Anatomy of an example
 
@@ -68,7 +76,7 @@ else.
 - **Accessible names inline**: each item's `aria-label`, each icon button's, the live region's.
 - **Tokens, not values that differ per theme**: fonts, padding, corners, the placeholder, the
   handles and the focus ring read the `--gl-*` tokens each theme declares (listed in
-  `_themes/<name>.css`). Geometry (columns, row height, gap) is the grid's own configuration,
+  `examples/shared/src/themes/<name>.css`). Geometry (columns, row height, gap) is the grid's own configuration,
   never a token.
 
 ## Rules

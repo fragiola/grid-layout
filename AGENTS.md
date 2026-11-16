@@ -17,8 +17,9 @@ Other adapters may follow React, so **every piece of logic that isn't rendering 
 |---|---|---|---|
 | `packages/core` | `@fragiola/grid-layout` | the layout rules (geometry, collision, move, compaction), the typed model and its commands, the engine that binds one grid to the DOM | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/grid-layout-react` | the `GridLayout.*` primitives and hooks over the core | peer `react`, `react-dom` (^19) |
-| `apps/playground` | private | the dev app (every site example live, with themes and source), unstyled fixture pages driven by Playwright | both packages, `examples/react` |
-| `examples/react`, `site` | private | the site's examples (the embed app) and pages, exported for fragiola.com | |
+| `apps/playground` | private | the dev app (every site example live, with themes and source), unstyled fixture pages driven by Playwright | both packages, `examples/react`, `examples/shared` |
+| `examples/shared` | private | what every framework's examples share and no reader copies: each example's metadata, the themes, the embed protocol, the manifest builder and loader generator, every Playwright spec; imports no framework | |
+| `examples/react`, `site` | private | the site's React examples (the embed app) and pages, exported for fragiola.com | `examples/shared` |
 
 ## Non-negotiable rules
 
@@ -234,14 +235,14 @@ an implementation detail.
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `playground`, `examples-react`, `site` |
+| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `playground`, `examples-shared`, `examples-react`, `site` |
 | `pnpm bench` | Vitest benchmarks (informative, not a gate) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages, Vite for the apps), then the `.d.ts` check |
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
-| `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and the examples app (Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
+| `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and each framework's examples app (`examples/<framework>`: the shared specs of `examples/shared/e2e` against its own embed, Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
 | `pnpm dev` | the playground on <http://localhost:5173>: every example live, the fixtures (`PLAYGROUND_PORT` moves it) |
 | `pnpm site:export --base /grid-layout --out <dir>` | the site export for fragiola.com (contract v1.2, `../www/CONTRACT.md`), self-validated |
-| `pnpm site:dev --base /grid-layout --port 5182` | the examples app with hot reload, under the base `www` proxies in dev |
+| `pnpm site:dev --base /grid-layout --port 5182` | every framework's examples app with hot reload, each under `<base>/embed/<framework>/`, behind one port (a Node proxy, `site/dev-proxy.ts`) that `www` proxies in dev |
 
 ## Repository layout
 
@@ -252,9 +253,12 @@ apps/playground/    src/shell/                   the shell: catalog, sidebar, to
                     src/fixture/                 what the fixture pages mount
                     fixtures/<name>/             unstyled pages Playwright drives
                     e2e/, tests/                 Playwright specs, unit tests
-examples/react/     src/examples/<slug>/         the site's examples (the embed app, Vite)
+examples/shared/    src/meta/<slug>.ts           every example's metadata, whatever the framework
+                    src/themes/, src/embed/      the five themes (CSS values), the embed message protocol
+                    scripts/                     the examples finder, the manifest builder, the loader generator
+                    e2e/                         the Playwright specs every framework runs, also inside an iframe
+examples/react/     src/examples/<slug>/         the site's React examples (the embed app, Vite)
                     src/components, lib, …       Fragiola UI, vendored (scripts/vendor-fragiola.ts)
-                    e2e/                         Playwright specs, also inside an iframe
 site/               docs/                        the pages fragiola.com/grid-layout serves
                     export.ts, contract.ts       `pnpm site:export` and its validation
 scripts/                                         the `.d.ts` check, the size report, the source condition
@@ -268,8 +272,8 @@ the core, the React primitives and the examples. A sidebar, a theme switch (the 
 themes) and the source beside the stage; the state is in the URL
 (`?example=<slug>&theme=<name>&code=1`).
 
-- **Examples** live in `examples/react/src/examples` and are public: the site embeds them, readers
-  copy them. The playground reads them in place (`import.meta.glob`, the `#/` alias and the
+- **Examples** live in `examples/react/src/examples` (their metadata in `examples/shared/src/meta`)
+  and are public: the site embeds them, readers copy them. The playground reads them in place (`import.meta.glob`, the `#/` alias and the
   pre-paint theme from `examples/react/vite.shared.ts`); it never keeps a second list.
 - **Fixtures** (`fixtures/<name>/`) are the unstyled pages Playwright drives; the sidebar links
   them.
@@ -407,7 +411,8 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
 The docs and examples are served by `fragiola.com/grid-layout`, built by the `www` repo from this
 repo's **site export** (`../www/CONTRACT.md`, v1.2). This repo only provides: the pages
 (`site/docs`, base-free links, the v1.2 vocabulary), the gallery configuration (`examples.json`)
-and the examples app (`examples/react`, built for `<base>/embed/react/`). `www` owns the shell,
+and one examples app per framework of `site/project.json` (`examples/<framework>`, built for
+`<base>/embed/<framework>/`; React today), sharing `examples/shared`. `www` owns the shell,
 the gallery chrome, the code panel and search. A page's `title` is at most 60 characters and
 never repeats "Grid Layout"; its `description` is 50–160 characters, plain words, no `: ` (YAML);
 a page body has no `#` and never skips a heading level; `pnpm site:export` checks all of it.
