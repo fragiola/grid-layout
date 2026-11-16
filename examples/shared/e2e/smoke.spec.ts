@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { listMetaSlugs } from "../scripts/examples-lib.ts";
 import { collectErrors, EXAMPLES, openExample, reset, THEMES } from "./helpers";
 
 // Every example mounts and logs no error, in the reference theme (the first of THEMES); a new
@@ -21,8 +22,10 @@ const REPRESENTATIVE: string[] = [
     "container-breakpoints", // two grids at two breakpoints, a range input
 ];
 
-const slugs = new Set(EXAMPLES.map((example) => example.slug));
-const missing = REPRESENTATIVE.filter((slug) => !slugs.has(slug));
+// a framework may ship a subset of the examples: a representative one it lacks is skipped with
+// the others, but a name no example has at all is a typo
+const known = new Set(listMetaSlugs());
+const missing = REPRESENTATIVE.filter((slug) => !known.has(slug));
 if (missing.length > 0) {
     throw new Error(
         `smoke.spec.ts: REPRESENTATIVE names examples that do not exist: ${missing.join(", ")}`,
