@@ -1,6 +1,6 @@
 ---
 title: Your first grid
-description: From a layout of plain objects to a dashboard that drags, resizes and pushes, then styled from outside.
+description: From a layout of plain objects to a dashboard that drags, resizes and pushes, then styled from outside, in React or Vue.
 ---
 
 This page builds the grid of the [`hello-grid`](/examples/hello-grid) example, step by step.
@@ -14,6 +14,8 @@ This page builds the grid of the [`hello-grid`](/examples/hello-grid) example, s
 A layout is an array of items in grid units: `x` and `y` are the first column and row, `w` and
 `h` the width and height in columns and rows. `id` names each item.
 
+<Framework name="react">
+
 ```tsx title="layout.ts"
 import type { Layout } from "@fragiola/grid-layout-react";
 
@@ -24,6 +26,22 @@ export const layout: Layout = [
 ];
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts title="layout.ts"
+import type { Layout } from "@fragiola/grid-layout-vue";
+
+export const layout: Layout = [
+    { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+    { id: "orders", x: 4, y: 0, w: 4, h: 2 },
+    { id: "visitors", x: 8, y: 0, w: 4, h: 2 },
+];
+```
+
+</Framework>
+
 </Step>
 
 <Step>
@@ -32,6 +50,8 @@ export const layout: Layout = [
 
 `Root` takes the layout and the grid's measurements; `Items` hands you each item to render. The
 item is yours: put anything inside.
+
+<Framework name="react">
 
 ```tsx title="dashboard.tsx"
 import { GridLayout } from "@fragiola/grid-layout-react";
@@ -51,6 +71,31 @@ export function Dashboard() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+In Vue, `Items` renders its default slot for each item (`v-slot="{ item }"`).
+
+```vue title="dashboard.vue"
+<script setup lang="ts">
+import { GridLayout } from "@fragiola/grid-layout-vue";
+import { layout } from "./layout";
+</script>
+
+<template>
+    <GridLayout.Root :default-layout="layout" :cols="12" :row-height="64" :gap="[12, 12]">
+        <GridLayout.Items v-slot="{ item }">
+            <GridLayout.Item :item-id="item.id" :aria-label="item.id">
+                {{ item.id }}
+            </GridLayout.Item>
+        </GridLayout.Items>
+    </GridLayout.Root>
+</template>
+```
+
+</Framework>
+
 It already drags: press an item and move. It has no look: the next step gives it one.
 
 </Step>
@@ -62,6 +107,8 @@ It already drags: press an item and move. It has no look: the next step gives it
 A `ResizeHandle` is a side or corner the item is resized from; a `Placeholder` shows where the
 held item would land. Neither has a look or a size of its own.
 
+<Framework name="react">
+
 ```tsx title="dashboard.tsx"
 <GridLayout.Item itemId={item.id} aria-label={item.id} className="card">
     {item.id}
@@ -71,14 +118,29 @@ held item would land. Neither has a look or a size of its own.
 <GridLayout.Placeholder className="placeholder" />
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="dashboard.vue"
+<GridLayout.Item :item-id="item.id" :aria-label="item.id" class="card">
+    {{ item.id }}
+    <GridLayout.ResizeHandle side="bottom-end" :aria-label="`Resize ${item.id}`" class="corner" />
+</GridLayout.Item>
+
+<GridLayout.Placeholder class="placeholder" />
+```
+
+</Framework>
+
 </Step>
 
 <Step>
 
 ## Style the parts
 
-Every part takes `className` (a string, or a function of its state) and exposes its state as
-`data-*` attributes.
+Every part exposes its state as `data-*` attributes. In React, `className` also takes a function
+of the state; in Vue, `class` takes a value, and the `data-*` attributes carry the state.
 
 ```css title="dashboard.css"
 .card { border: 1px solid #ddd; border-radius: 8px; background: white; cursor: grab; }
@@ -94,14 +156,32 @@ Every part takes `className` (a string, or a function of its state) and exposes 
 
 ## Keep the changes
 
-`onLayoutChange` tells you the layout after every committed change, once: never during a
+`onLayoutChange` (in Vue, `v-model:layout`) tells you the layout after every committed change, once: never during a
 gesture. Save it, or hold the layout in your state and pass it as `layout`.
+
+<Framework name="react">
 
 ```tsx title="dashboard.tsx"
 const [layout, setLayout] = useState(start);
 
 <GridLayout.Root layout={layout} onLayoutChange={setLayout}>…</GridLayout.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="dashboard.vue"
+<script setup lang="ts">
+const layout = ref(start);
+</script>
+
+<template>
+    <GridLayout.Root v-model:layout="layout">…</GridLayout.Root>
+</template>
+```
+
+</Framework>
 
 </Step>
 
