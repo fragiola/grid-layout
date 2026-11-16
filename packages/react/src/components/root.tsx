@@ -18,12 +18,10 @@ import {
     type GridLayoutModel,
     type Layout,
     type LayoutConstraint,
-    type LayoutItem,
     normaliseLayout,
     type PerBreakpoint,
     type RootState,
     rootPart,
-    sameItemConstraints,
     verticalCompactor,
 } from "@fragiola/grid-layout";
 import type * as React from "react";
@@ -37,10 +35,14 @@ import {
     useState,
     useSyncExternalStore,
 } from "react";
-import { GridLayoutContext, ViewContext } from "./context";
-import { attachGridLayoutRef, type GridLayoutRef } from "./gridLayoutRef";
-import { type DropDetails, dropDetailsOf } from "./hooks";
-import { type DivPrimitiveProps, useRenderElement } from "./utils/useRender";
+import { GridLayoutContext, ViewContext } from "../context";
+import { type DropDetails, dropDetailsOf } from "../utils/drop-details";
+import {
+    attachGridLayoutRef,
+    type GridLayoutRef,
+} from "../utils/grid-layout-ref";
+import { sameLayout } from "../utils/same-layout";
+import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export type { RootState };
 
@@ -162,22 +164,6 @@ export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     children?: ReactNode;
 };
 
-const ITEM_KEYS = [
-    "id",
-    "x",
-    "y",
-    "w",
-    "h",
-    "minW",
-    "maxW",
-    "minH",
-    "maxH",
-    "static",
-    "draggable",
-    "resizable",
-    "constraints",
-] as const satisfies readonly (keyof LayoutItem)[];
-
 /** The rules' default breakpoints: one, at every width. */
 const ONE_BREAKPOINT = { [DEFAULT_BREAKPOINT]: 0 };
 
@@ -197,25 +183,6 @@ function useStable<T extends number | Readonly<Record<string, number>>>(
             Object.entries(a).every(([key, each]) => b[key] === each));
     if (!same(kept.current, value)) kept.current = value;
     return kept.current;
-}
-
-/** Whether two layouts hold the same items, field by field, in the same order. */
-export function sameLayout(a: Layout, b: Layout): boolean {
-    return (
-        a === b ||
-        (a.length === b.length &&
-            a.every((item, index) => {
-                const other = b[index];
-                return (
-                    other !== undefined &&
-                    ITEM_KEYS.every((key) =>
-                        key === "constraints"
-                            ? sameItemConstraints(item[key], other[key])
-                            : item[key] === other[key],
-                    )
-                );
-            }))
-    );
 }
 
 const CALLBACKS: Record<string, keyof RootProps> = {

@@ -3,7 +3,7 @@
 // runs commands, an announcer next to the grid.
 
 import { useState, useSyncExternalStore } from "react";
-import type { GridLayoutContextValue } from "./context";
+import type { GridLayoutContextValue } from "../context";
 
 /**
  * A handle on a grid layout from outside its `GridLayout.Root`: `current` is the grid's model and

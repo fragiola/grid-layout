@@ -37,7 +37,7 @@
             "default": "./dist/index.js"
         },
         "./compactors": {
-            "@fragiola/source": "./src/compactors.ts",
+            "@fragiola/source": "./src/compactors/index.ts",
             "types": "./dist/compactors.d.ts",
             "import": "./dist/compactors.js",
             "default": "./dist/compactors.js"
