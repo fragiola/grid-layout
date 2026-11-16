@@ -1,10 +1,8 @@
-// Whether two layouts are the same, item by item: what a controlled root compares a new `layout` with.
+// Whether two layouts are the same, item by item: what a controlled root compares a new `layout` with,
+// in every adapter.
 
-import {
-    type Layout,
-    type LayoutItem,
-    sameItemConstraints,
-} from "@fragiola/grid-layout";
+import { sameItemConstraints } from "./constraints";
+import type { Layout, LayoutItem } from "./types";
 
 const ITEM_KEYS = [
     "id",

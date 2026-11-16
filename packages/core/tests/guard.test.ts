@@ -29,8 +29,13 @@ function codeOnly(source: string): string {
 const GLOBAL_DOM =
     /(?<![.\w$])(document|window|requestAnimationFrame|cancelAnimationFrame|getComputedStyle|navigator|localStorage|sessionStorage|ResizeObserver|crypto)\b(?!\s*:)/;
 
-const IMPORT_REACT =
-    /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'](?:react|react-dom)(?:\/[^"']*)?["']/;
+const IMPORT_FRAMEWORK =
+    /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'](?:react|react-dom|vue|@vue\/[^"']+|@angular\/[^"']+)(?:\/[^"']*)?["']/;
+
+/** The packages of the repository: the core and each adapter. */
+const PACKAGES = readdirSync(join(root, "..")).filter((name) =>
+    existsSync(join(root, "..", name, "package.json")),
+);
 
 /**
  * The files derived from a reference project (D2), each with the project it comes from. A file
@@ -107,9 +112,9 @@ describe("core package guard", () => {
         expect(pkg.peerDependencies ?? {}).toEqual({});
     });
 
-    it("never imports react or react-dom", () => {
+    it("never imports a framework: react, react-dom, vue, angular", () => {
         const offenders = listFiles(src).filter((file) =>
-            IMPORT_REACT.test(readFileSync(file, "utf8")),
+            IMPORT_FRAMEWORK.test(readFileSync(file, "utf8")),
         );
         expect(offenders).toEqual([]);
     });
@@ -158,7 +163,7 @@ describe("core package guard", () => {
                 expect(rootLicence).toContain(line);
             }
         }
-        for (const pkg of ["core", "react"]) {
+        for (const pkg of PACKAGES) {
             expect(readFileSync(join(root, "..", pkg, "LICENSE"), "utf8")).toBe(
                 rootLicence,
             );
@@ -166,7 +171,7 @@ describe("core package guard", () => {
     });
 
     it("ships no CSS: styling is 100% the app's (D5)", () => {
-        const css = ["core", "react"].flatMap((pkg) => {
+        const css = PACKAGES.flatMap((pkg) => {
             const dir = join(root, "..", pkg, "src");
             return existsSync(dir)
                 ? listFiles(dir).filter((file) =>
@@ -193,12 +198,22 @@ describe("core package guard", () => {
         expect(found("function f(window: Window) {}")).toBe(false);
     });
 
-    it("detects a react import and an exported any", () => {
-        expect(IMPORT_REACT.test('import type * as React from "react";')).toBe(
-            true,
+    it("detects a framework import and an exported any", () => {
+        expect(
+            IMPORT_FRAMEWORK.test('import type * as React from "react";'),
+        ).toBe(true);
+        expect(IMPORT_FRAMEWORK.test('import "react-dom/client";')).toBe(true);
+        expect(IMPORT_FRAMEWORK.test('import { ref } from "vue";')).toBe(true);
+        expect(
+            IMPORT_FRAMEWORK.test('import { mount } from "@vue/test-utils";'),
+        ).toBe(true);
+        expect(
+            IMPORT_FRAMEWORK.test('import { inject } from "@angular/core";'),
+        ).toBe(true);
+        expect(IMPORT_FRAMEWORK.test('import { x } from "./reactive";')).toBe(
+            false,
         );
-        expect(IMPORT_REACT.test('import "react-dom/client";')).toBe(true);
-        expect(IMPORT_REACT.test('import { x } from "./reactive";')).toBe(
+        expect(IMPORT_FRAMEWORK.test('import { x } from "./vue-like";')).toBe(
             false,
         );
         expect(

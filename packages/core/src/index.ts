@@ -1,13 +1,30 @@
 // @fragiola/grid-layout: the framework-free core of the headless grid layout.
 
 export {
+    type BreakpointInfo,
+    breakpointInfoOf,
+    breakpointKey,
+} from "./engine/breakpoint-info";
+export {
     DRAG_EXEMPT,
     ITEM_ATTRIBUTE,
     NO_DRAG_ATTRIBUTE,
     PART_ATTRIBUTE,
     PRESSING_ATTRIBUTE,
 } from "./engine/dom";
+export {
+    type DropDetails,
+    dragSourceStatus,
+    dropDetailsOf,
+    isDropFrom,
+} from "./engine/drop-details";
 export { createGridLayoutEngine } from "./engine/engine";
+export {
+    attachGridLayoutRef,
+    createGridLayoutRef,
+    type GridLayoutHandle,
+    type GridLayoutRef,
+} from "./engine/grid-layout-ref";
 export {
     type CellState,
     cellPart,
@@ -30,6 +47,12 @@ export {
     rootPart,
     type StructuralStyle,
 } from "./engine/parts";
+export {
+    createGridLayoutRootBinding,
+    type GestureCallback,
+    type GridLayoutRootBinding,
+    type GridLayoutRootOptions,
+} from "./engine/root-binding";
 export type {
     CellRows,
     Direction,
@@ -115,6 +138,7 @@ export {
     generateLayout,
     sortBreakpoints,
 } from "./layout/responsive";
+export { sameLayout } from "./layout/same-layout";
 export {
     type Compactor,
     type CompactType,
