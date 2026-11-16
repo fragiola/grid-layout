@@ -1,15 +1,12 @@
 // @fragiola/grid-layout-react: composable, unstyled React primitives over @fragiola/grid-layout.
 
 export * from "@fragiola/grid-layout";
-export { type GestureCallback, Root, type RootProps } from "./components/root";
+export { Root, type RootProps } from "./components/root";
 export {
     GridLayoutContext,
     type GridLayoutContextValue,
 } from "./context";
-export {
-    type BreakpointInfo,
-    useBreakpoint,
-} from "./hooks/use-breakpoint";
+export { useBreakpoint } from "./hooks/use-breakpoint";
 export { type CellHookResult, useCells } from "./hooks/use-cells";
 export { useDragHandle } from "./hooks/use-drag-handle";
 export { useDragPreview } from "./hooks/use-drag-preview";
@@ -45,13 +42,7 @@ export {
     ResizeHandle,
     type ResizeHandleProps,
 } from "./parts";
-export type { DropDetails } from "./utils/drop-details";
-export {
-    createGridLayoutRef,
-    type GridLayoutRef,
-    useGridLayoutRef,
-} from "./utils/grid-layout-ref";
-export { sameLayout } from "./utils/same-layout";
+export { useGridLayoutRef } from "./utils/grid-layout-ref";
 export type {
     DivPrimitiveProps,
     PrimitiveProps,

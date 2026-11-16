@@ -1,27 +1,112 @@
 ---
 title: Installation
-description: Install the React package, check the peer dependencies, and see why there is no stylesheet to import.
+description: Install the package for your framework, React or Vue, check the peer dependencies, and see why there is no stylesheet to import.
 ---
 
-## Install the package
+<Framework name="react">
 
-```sh title="Terminal"
-pnpm add @fragiola/grid-layout-react
-```
+A React app installs one package, `@fragiola/grid-layout-react`: the primitives, the hooks and the
+whole framework-free core, re-exported.
 
-The core, `@fragiola/grid-layout`, comes along: import its types and helpers from the React
-package, which re-exports it.
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/grid-layout-react
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/grid-layout-react
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/grid-layout-react
+        ```
+    </Tab>
+</Tabs>
+
+</Framework>
+
+<Framework name="vue">
+
+A Vue app installs one package, `@fragiola/grid-layout-vue`: the components, the composables and
+the whole framework-free core, re-exported.
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/grid-layout-vue
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/grid-layout-vue
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/grid-layout-vue
+        ```
+    </Tab>
+</Tabs>
+
+</Framework>
+
+The core, `@fragiola/grid-layout`, comes along: import its types and helpers from your
+framework's package, which re-exports it.
 
 ## Peer dependencies
 
-The React package needs React 19 (`react` and `react-dom`). It has no other runtime dependency,
-and the core has none at all: no drag library, no resize library.
+| requirement | why |
+| --- | --- |
+| `react` and `react-dom` **^19** (React) | peer dependencies of `@fragiola/grid-layout-react`: the primitives use `ref` as a plain prop and ref cleanup functions |
+| `vue` **^3.5** (Vue) | the peer dependency of `@fragiola/grid-layout-vue` |
+| A browser DOM | the engine measures the root and its items; the model loads in plain Node (tests, a server) |
+
+The packages have no other runtime dependency, and the core has none at all: no drag library, no
+resize library.
+
+## What to import from where
+
+<Framework name="react">
+
+```tsx
+import {
+    // the primitives (one namespace) and the hooks
+    GridLayout,
+    useGridLayout,
+    // the core: its types and helpers
+    type Layout,
+    verticalCompactor,
+} from "@fragiola/grid-layout-react";
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import {
+    // the components (one namespace) and the composables
+    GridLayout,
+    useGridLayout,
+    // the core: its types and helpers
+    type Layout,
+    verticalCompactor,
+} from "@fragiola/grid-layout-vue";
+```
+
+The components are the React package's primitives, written the Vue way (props, events, slots):
+[Vue components](/docs/api/vue) maps each React prop.
+
+</Framework>
 
 ## No stylesheet
 
 There is nothing to import for styles. The primitives set only the inline style they need to work
-(a position, a size, a transform). Style every part with your own classes, through `className`,
-`style` or `render`. See [Styling with Tailwind](/docs/guides/styling-tailwind) and
+(a position, a size, a transform). Style every part with your own classes and the `data-*`
+attributes it exposes. See [Styling with Tailwind](/docs/guides/styling-tailwind) and
 [Styling with plain CSS](/docs/guides/styling-css).
 
 <Callout type="info" title="A width to lay out in">

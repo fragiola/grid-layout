@@ -2,27 +2,22 @@
 // declarative props onto commands (D3) and tells the app what changed (D9).
 
 import {
+    attachGridLayoutRef,
     type Breakpoints,
-    breakpointFor,
     type Compactor,
     type ConstraintRegistry,
-    createGridLayoutEngine,
-    createGridLayoutModel,
-    DEFAULT_BREAKPOINT,
+    createGridLayoutRootBinding,
     type Direction,
-    defaultConstraints,
+    type DropDetails,
     type ExternalDragAnswer,
-    type GestureEvent,
-    type GridLayoutEngine,
+    type GestureCallback,
     type GridLayoutEngineOptions,
-    type GridLayoutModel,
+    type GridLayoutRef,
     type Layout,
     type LayoutConstraint,
-    normaliseLayout,
     type PerBreakpoint,
     type RootState,
     rootPart,
-    verticalCompactor,
 } from "@fragiola/grid-layout";
 import type * as React from "react";
 import {
@@ -36,18 +31,9 @@ import {
     useSyncExternalStore,
 } from "react";
 import { GridLayoutContext, ViewContext } from "../context";
-import { type DropDetails, dropDetailsOf } from "../utils/drop-details";
-import {
-    attachGridLayoutRef,
-    type GridLayoutRef,
-} from "../utils/grid-layout-ref";
-import { sameLayout } from "../utils/same-layout";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
-export type { RootState };
-
-/** A gesture's step, as the `onDrag*` and `onResize*` callbacks receive it. */
-export type GestureCallback = (event: GestureEvent) => void;
+export type { GestureCallback, RootState };
 
 export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     /** the items (the active breakpoint's), controlled; pair it with `onLayoutChange` */
@@ -164,36 +150,6 @@ export type RootProps = Omit<DivPrimitiveProps<RootState>, "onDrop"> & {
     children?: ReactNode;
 };
 
-/** The rules' default breakpoints: one, at every width. */
-const ONE_BREAKPOINT = { [DEFAULT_BREAKPOINT]: 0 };
-
-/**
- * `value`, the same object as long as its content is: a number, or a map of numbers compared key
- * by key (a prop written inline is a new object each render).
- */
-function useStable<T extends number | Readonly<Record<string, number>>>(
-    value: T,
-): T {
-    const kept = useRef(value);
-    const same = (a: T, b: T) =>
-        a === b ||
-        (typeof a === "object" &&
-            typeof b === "object" &&
-            Object.keys(a).length === Object.keys(b).length &&
-            Object.entries(a).every(([key, each]) => b[key] === each));
-    if (!same(kept.current, value)) kept.current = value;
-    return kept.current;
-}
-
-const CALLBACKS: Record<string, keyof RootProps> = {
-    "drag-start": "onDragStart",
-    drag: "onDrag",
-    "drag-stop": "onDragStop",
-    "resize-start": "onResizeStart",
-    resize: "onResize",
-    "resize-stop": "onResizeStop",
-};
-
 /** The grid layout: a positioned box its items are placed in, as tall as the layout. */
 export function Root(props: RootProps) {
     const {
@@ -243,74 +199,17 @@ export function Root(props: RootProps) {
     const latest = useRef(props);
     latest.current = props;
 
-    const [{ model, engine, given }] = useState(() => {
-        const start = layout ?? defaultLayout;
-        const startAll = layouts ?? defaultLayouts;
-        const created: GridLayoutModel = createGridLayoutModel({
-            layout: start,
-            layouts: startAll,
-            breakpoints,
-            breakpoint: breakpoint ?? defaultBreakpoint,
-            cols,
-            maxRows,
-            compactor,
-            preventCollision,
-            allowOverlap,
-            constraints,
-            constraintRegistry,
-        });
-        // the breakpoint the grid starts at, before the engine measures (or is told) another
-        const initial = created.state.breakpoint;
-        const bound: GridLayoutEngine = createGridLayoutEngine(created, {
-            rowHeight,
-            gap,
-            padding,
-            autoSize,
-            width,
-            draggable,
-            resizable,
-            bounded,
-            threshold,
-            touchDelay,
-            touchTolerance,
-            autoScroll,
-            breakpoint,
-            dir,
-            scale,
-        });
-        return {
-            model: created,
-            engine: bound,
-            given: {
-                layout: start ?? (startAll ? undefined : []),
-                layouts: startAll,
-                breakpoint: initial,
-            },
-        };
-    });
+    // the model and the engine, made from the first props; the steps below keep them in line with
+    // the latest ones (the core's, so every adapter decides the same)
+    const [binding] = useState(() =>
+        createGridLayoutRootBinding(() => latest.current),
+    );
+    const { model, engine } = binding;
 
     // the engine's options after each render: setting them may tell a new view, which must not
     // happen while React renders
     useLayoutEffect(() => {
-        engine.adapter.setOptions({
-            rowHeight,
-            gap,
-            padding,
-            autoSize,
-            width,
-            draggable,
-            resizable,
-            bounded,
-            threshold,
-            touchDelay,
-            touchTolerance,
-            autoScroll,
-            breakpoint,
-            dir,
-            scale,
-            onExternalDrag,
-            createId,
-        });
+        binding.setOptions();
     });
 
     const view = useSyncExternalStore(
@@ -333,217 +232,20 @@ export function Root(props: RootProps) {
     // controlled: a change the parent does not take is undone at its next render, which this
     // forces (a parent that ignores onLayoutChange may not render again)
     const [, rerender] = useReducer((count: number) => count + 1, 0);
-    /** the prop is being applied: its commit is not a change of the user's to tell */
-    const syncing = useRef(false);
 
+    useLayoutEffect(() => binding.listenModel(rerender), [binding]);
+
+    useLayoutEffect(() => binding.listenEngine(), [binding]);
+
+    // the rules, the controlled layouts and the controlled layout, after each render
     useLayoutEffect(() => {
-        const tell = () =>
-            latest.current.onLayoutChange?.(
-                model.get("layout"),
-                model.get("layouts"),
-            );
-        const unsubscribe = model.subscribe((event) => {
-            const { before, after } = event;
-            const switched = before.breakpoint !== after.breakpoint;
-            if (switched)
-                latest.current.onBreakpointChange?.(
-                    after.breakpoint,
-                    after.cols,
-                );
-            if (syncing.current) return;
-            if (before.layouts === after.layouts && !switched) return;
-            // a breakpoint without a layout yet: generated right after, and told then
-            if (!after.layouts[after.breakpoint]) return;
-            tell();
-            if (
-                latest.current.layout !== undefined ||
-                latest.current.layouts !== undefined
-            ) {
-                rerender();
-            }
-        });
-        // the breakpoint the grid measured (or was told) before this listened: told on mount
-        const now = model.get("breakpoint");
-        const moved = now !== given.breakpoint;
-        if (moved) latest.current.onBreakpointChange?.(now, model.get("cols"));
-        // on mount, a layout that had to be corrected (or was generated) is told once (D9)
-        const all = model.get("layouts");
-        const corrected = given.layouts
-            ? Object.entries(all).some(([name, settled]) => {
-                  const start = given.layouts?.[name];
-                  return start === undefined || !sameLayout(start, settled);
-              })
-            : !sameLayout(given.layout ?? [], model.get("layout"));
-        // a breakpoint change alone is not a layout change on mount: onBreakpointChange tells it
-        if (corrected) tell();
-        return unsubscribe;
-    }, [model, given]);
-
-    useLayoutEffect(
-        () =>
-            engine.subscribe((event) => {
-                if (event.type === "drop" && event.external) {
-                    latest.current.onDrop?.(dropDetailsOf(event));
-                    return;
-                }
-                const name = CALLBACKS[event.type];
-                const callback = name ? latest.current[name] : undefined;
-                if (typeof callback === "function")
-                    (callback as GestureCallback)(event);
-            }),
-        [engine],
-    );
-
-    // the rules, each at its default when the prop is absent: a change re-settles every layout
-    // (and is told, as any committed change). Maps compare by content: written inline, a new
-    // object each render, they configure nothing again
-    const stableBreakpoints = useStable(breakpoints ?? ONE_BREAKPOINT);
-    const stableCols = useStable(cols ?? 12);
-    useLayoutEffect(() => {
-        // when the breakpoints drop the active one: the one the grid's width gives, in one step
-        const width = engine.get("geometry")?.width ?? 0;
-        const result = model.run("grid.configure", {
-            settings: {
-                breakpoints: stableBreakpoints,
-                breakpoint: breakpointFor(stableBreakpoints, width),
-                cols: stableCols,
-                maxRows: maxRows ?? Number.POSITIVE_INFINITY,
-                compactor: compactor ?? verticalCompactor,
-                preventCollision: preventCollision ?? false,
-                allowOverlap: allowOverlap ?? false,
-                constraints: constraints ?? defaultConstraints,
-            },
-        });
-        // the same error a mount with these props throws: rules that cannot be used
-        if (!result.ok) {
-            throw new TypeError(`invalid options: ${result.error.message}`);
-        }
-    }, [
-        model,
-        engine,
-        stableBreakpoints,
-        stableCols,
-        maxRows,
-        compactor,
-        preventCollision,
-        allowOverlap,
-        constraints,
-    ]);
-
-    // the controlled layouts: the breakpoints the prop names hold what it says, settled in their
-    // columns; the ones it leaves out keep what the model generated (no loop with a parent that
-    // keeps an incomplete map)
-    const checkedAll = useRef<{
-        prop: Readonly<Record<string, Layout>>;
-        model: Readonly<Record<string, Layout>>;
-    } | null>(null);
-    useLayoutEffect(() => {
-        if (layouts === undefined) return;
-        const current = model.get("layouts");
-        const last = checkedAll.current;
-        if (last && last.prop === layouts && last.model === current) return;
-        const rules = model.get("rules");
-        const differs = Object.entries(layouts).some(([name, given]) => {
-            const cols = model.get("cols-by", { breakpoint: name });
-            if (cols === undefined) return true;
-            const settled = normaliseLayout(given, { ...rules, cols });
-            return (
-                !settled.ok || !sameLayout(settled.layout, current[name] ?? [])
-            );
-        });
-        if (!differs) {
-            checkedAll.current = { prop: layouts, model: current };
-            return;
-        }
-        syncing.current = true;
-        let result: ReturnType<typeof model.run<"layouts.set">>;
-        try {
-            result = model.run("layouts.set", {
-                layouts: { ...current, ...layouts },
-            });
-        } finally {
-            syncing.current = false;
-        }
-        // the same error a mount with these layouts throws: layouts that cannot be used
-        if (!result.ok) {
-            throw new TypeError(`invalid layouts: ${result.error.message}`);
-        }
-        const next = model.get("layouts");
-        checkedAll.current = { prop: layouts, model: next };
-        // the parent's layouts had to be corrected (or a layout was generated): told once
-        if (
-            result.ok &&
-            Object.entries(next).some(
-                ([name, settled]) =>
-                    layouts[name] === undefined ||
-                    !sameLayout(layouts[name], settled),
-            )
-        ) {
-            latest.current.onLayoutChange?.(model.get("layout"), next);
-        }
+        binding.configure();
     });
-
-    // the controlled layout: the model holds the prop as it settles under the rules. A prop that
-    // has to be corrected is applied once and told once; it is not applied again while it stays
-    // the same (no loop with a parent that keeps it)
-    const checked = useRef<{
-        prop: Layout;
-        model: Layout;
-        breakpoint: string;
-    } | null>(null);
     useLayoutEffect(() => {
-        if (layout === undefined) return;
-        const current = model.get("layout");
-        const now = model.get("breakpoint");
-        const last = checked.current;
-        if (last && last.prop === layout && last.model === current) return;
-        // the breakpoint changed under the same prop: it is the breakpoint before's layout, and
-        // the parent was told the new one; it is not applied to the new breakpoint
-        const seen = last ?? {
-            prop: given.layout,
-            breakpoint: given.breakpoint,
-        };
-        if (seen.prop === layout && seen.breakpoint !== now) {
-            checked.current = { prop: layout, model: current, breakpoint: now };
-            return;
-        }
-        // a new prop (not the model changing under the same one, as a rule's change does)
-        const fresh = last !== null && last.prop !== layout;
-        const settled = normaliseLayout(layout, model.get("rules"));
-        if (!settled.ok) {
-            // the same error a mount with this layout throws: a layout that cannot be used
-            throw new TypeError(
-                `invalid layout: ${settled.problems.map((problem) => problem.message).join("; ")}`,
-            );
-        }
-        if (sameLayout(settled.layout, current)) {
-            checked.current = { prop: layout, model: current, breakpoint: now };
-            // a new prop the grid shows corrected is told, even when the grid did not change
-            // (on mount, the mount check tells it)
-            if (fresh && !sameLayout(settled.layout, layout)) {
-                latest.current.onLayoutChange?.(current, model.get("layouts"));
-            }
-            return;
-        }
-        syncing.current = true;
-        let result: ReturnType<typeof model.run<"layout.set">>;
-        try {
-            result = model.run("layout.set", { layout });
-        } finally {
-            syncing.current = false;
-        }
-        checked.current = {
-            prop: layout,
-            model: model.get("layout"),
-            breakpoint: now,
-        };
-        if (result.ok && !sameLayout(result.value.layout, layout)) {
-            // the parent's layout had to be corrected: it is told what holds, once
-            latest.current.onLayoutChange?.(
-                result.value.layout,
-                model.get("layouts"),
-            );
-        }
+        binding.syncLayouts();
+    });
+    useLayoutEffect(() => {
+        binding.syncLayout();
     });
 
     const attach = useCallback(

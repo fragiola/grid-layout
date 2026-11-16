@@ -38,4 +38,20 @@ A part hook returns `{ state, props }`: spread `props` onto any element to make 
 Outside the root, parts and hooks reach the grid through a `gridLayoutRef`
 (`useGridLayoutRef()`, or `createGridLayoutRef()` outside a component), given to the root too.
 
+## In Vue
+
+`@fragiola/grid-layout-vue` keeps the same contract, written the Vue way
+([Vue components](/docs/api/vue)):
+
+- `render` is `as` (a tag or a component) or the `render` scoped slot, which receives the props
+  to bind and the state.
+- Attributes and listeners fall through onto the part's element, under its structural style; a
+  part's own listeners compose with yours.
+- `class` and `style` take a value, not a function of the state: style the state through the
+  `data-*` attributes (`data-dragging:shadow-lg`, `[data-dragging]` in CSS), or read it from the
+  `render` slot.
+- `GridLayout.Items` is a scoped slot over the layout's items (`v-slot="{ item }"`): you still own
+  what each item renders.
+- A composable returns `{ state, props }` as computed refs: bind `props` with `v-bind`.
+
 <Example id="unstyled" />

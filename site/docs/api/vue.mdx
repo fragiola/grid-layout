@@ -1,0 +1,113 @@
+---
+title: Vue components
+description: The same primitives and hooks for Vue 3, from @fragiola/grid-layout-vue, and how each React prop maps onto Vue props, events and slots.
+---
+
+`@fragiola/grid-layout-vue` has every primitive of the React package as a Vue 3.5 component, and
+every hook as a composable, over the same core (re-exported whole). The behaviour, the `data-*`
+attributes and the ARIA of every element are the same, so every page of these docs applies: this
+page says how the React API is written in Vue.
+
+```ts
+import {
+    createGridLayoutRef,
+    GridLayout,
+    type Layout,
+    useGridLayout,
+    useGridLayoutRef,
+} from "@fragiola/grid-layout-vue";
+```
+
+## A grid in a template
+
+```vue title="dashboard.vue"
+<script setup lang="ts">
+import { GridLayout, type Layout } from "@fragiola/grid-layout-vue";
+import { ref } from "vue";
+
+const layout = ref<Layout>([
+    { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+    { id: "orders", x: 4, y: 0, w: 4, h: 2 },
+]);
+</script>
+
+<template>
+    <GridLayout.Root v-model:layout="layout" :cols="12" :row-height="64" aria-label="Dashboard">
+        <GridLayout.Items v-slot="{ item }">
+            <GridLayout.Item :item-id="item.id" :aria-label="item.id" class="card">
+                {{ item.id }}
+                <GridLayout.ResizeHandle side="bottom-end" :aria-label="`Resize ${item.id}`" class="corner" />
+            </GridLayout.Item>
+        </GridLayout.Items>
+        <GridLayout.Placeholder class="placeholder" />
+    </GridLayout.Root>
+</template>
+```
+
+The layout `v-model` gives you is your own copy: changing it never reaches the grid. To add, remove or move an item, give the root a new array (`layout.value = [...layout.value, item]`) or run a command (`model.run("item.add", …)`); changing the array in place is not seen.
+
+## How React's props map
+
+| React | Vue |
+| --- | --- |
+| `GridLayout.Root` props | the same props, in kebab-case in a template (`:row-height`, `:default-layout`, `prevent-collision`) |
+| `layout` + `onLayoutChange` | `v-model:layout` (`update:layout`, once per committed change); `@layout-change` still gives `(layout, layouts)` |
+| `layouts` + `onLayoutChange` | `v-model:layouts` (`update:layouts`) |
+| `onBreakpointChange`, `onDragStart`, `onDrag`, `onDragStop`, `onResizeStart`, `onResize`, `onResizeStop`, `onDrop` | listeners: `@breakpoint-change`, `@drag-start`, `@drag`, `@drag-stop`, `@resize-start`, `@resize`, `@resize-stop`, `@drop` |
+| `onExternalDrag`, `createId` | the same props: they answer, so they are functions, not events |
+| `render={<section />}` | `as="section"` (a tag or a component) |
+| `render={(props, state) => …}` | the `render` scoped slot, `#render="{ props, state, children }"`: bind `v-bind="props"` on your element and render `<component :is="children" />` inside it |
+| `className`, `style` | the `class` and `style` attributes, under the structural style |
+| `className={(state) => …}`, `style={(state) => …}` | no function form: a `data-*` selector (`data-dragging:shadow-lg`), or the `render` slot's `state` |
+| `onPointerDown`, `onKeyDown` on a part | `@pointerdown`, `@keydown`: they run before the engine's, so `preventDefault` vetoes a gesture or replaces a key |
+| `Items` children `(item) => …` | the default slot, `v-slot="{ item }"` |
+| `Cells` children `(cell) => …` | the default slot, `v-slot="{ cell }"`; `rows` prop |
+| `DragPreview` children `(state) => …` | the default slot, `v-slot="{ state }"` |
+| other parts' children | the default slot, with `{ state }` |
+| `itemId` (`Item`, `DragHandle`, `ResizeHandle`, `DragSource`) | `item-id` |
+| `GridLayoutContext` | `GridLayoutKey`, the injection key |
+
+## Components
+
+Every part is `GridLayout.<Part>`, with the props of its React page except `render`, `className`,
+`style` and `children` (see the table above). Each accepts `as` and the `render` slot.
+
+| component | props | slots |
+| --- | --- | --- |
+| `GridLayout.Root` | the layout, its rules and geometry (`layout`, `default-layout`, `layouts`, `breakpoints`, `cols`, `row-height`, `gap`, `padding`, `max-rows`, `compactor`, `bounded`, `dir`, …), `grid-layout-ref`, `on-external-drag`, `create-id` | default, `render` |
+| `GridLayout.Items` | none | default `{ item }`: one per item, keyed by its id |
+| `GridLayout.Item` | `item-id` | default `{ state }`, `render` |
+| `GridLayout.DragHandle` | `item-id?` | default `{ state }`, `render` |
+| `GridLayout.ResizeHandle` | `side`, `item-id?` | default `{ state }`, `render` |
+| `GridLayout.Placeholder` | none | default `{ state }`, `render` |
+| `GridLayout.Cells` | `rows?` | default `{ cell }`, `render` |
+| `GridLayout.DragSource` | `item`, `item-id?`, `data?`, `drag-offset?`, `disabled?`, `grid-layout-ref?`; `@drop` | default `{ state }`, `render` |
+| `GridLayout.DragPreview` | `grid-layout-ref?` | default `{ state }`, `render` |
+
+## Composables
+
+The hooks have the same names. A composable reads what changes through a `ComputedRef`, and takes
+a value, a ref or a getter where the React hook takes a value.
+
+| React | Vue |
+| --- | --- |
+| `useGridLayout()` / `useGridLayout(ref)` | `{ model, engine }` / a `ComputedRef` of it, `null` until a root holds the ref |
+| `useGridLayoutView()` / `(ref)` | `ComputedRef<GridLayoutView>` / `ComputedRef<GridLayoutView \| undefined>` |
+| `useItems()`, `useGesture()` | `ComputedRef<Layout>`, `ComputedRef<GestureView \| undefined>` |
+| `useGridLayoutEvents(listener, ref?)` | the same; unsubscribed when the component unmounts |
+| `useItem(itemId)`, `useDragHandle(itemId?)`, `useResizeHandle(side, itemId?)` | the same arguments; `{ state, props }` as computed refs, `props` holding the `data-*`, the structural `style`, `tabindex` and a function `ref` |
+| `usePlaceholder()`, `useDragPreview(ref?)` | `ComputedRef<{ state, props } \| undefined>` |
+| `useCells(rows?)` | `ComputedRef<readonly CellHookResult[]>`, made again only when the cells move |
+| `useDragSource(options)` | options as a value or a getter; `props` adds `onPointerdown` and `onKeydown` |
+| `useBreakpoint(ref?)` | `ComputedRef<BreakpointInfo>` / `ComputedRef<BreakpointInfo \| undefined>` |
+| `createGridLayoutRef()`, `useGridLayoutRef()` | the same |
+
+## Opt-in compactors
+
+The core's opt-in compactors are the `/compactors` entry, as in React:
+
+```ts
+import { fastVerticalCompactor } from "@fragiola/grid-layout-vue/compactors";
+```
+
+<Example id="hello-grid" />

@@ -128,6 +128,17 @@
             ]
         },
         {
+            "label": "API: Vue (@fragiola/grid-layout-vue)",
+            "collapsible": true,
+            "defaultOpen": false,
+            "pages": [
+                {
+                    "label": "Vue components",
+                    "path": "api/vue"
+                }
+            ]
+        },
+        {
             "label": "Project",
             "pages": [
                 {

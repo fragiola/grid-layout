@@ -8,18 +8,21 @@ assumes Tailwind, shadcn or anything else.
 
 Its behaviour reference is React Grid Layout (`../react-grid-layout`, MIT). Its architecture is
 Fragiola's, shared with Dockable (`../dockable`) and Data Grid (`../data-grid`): a framework-free
-core, a typed model of commands, an engine per grid on screen, and React primitives under the
-Dockable primitive contract, with the keyboard and right-to-left from day one.
+core, a typed model of commands, an engine per grid on screen, and React and Vue primitives under
+the Dockable primitive contract, with the keyboard and right-to-left from day one.
 
-Other adapters may follow React, so **every piece of logic that isn't rendering lives in the core**.
+Each framework has an adapter, so **every piece of logic that isn't rendering lives in the core**:
+what a `Root` decides from its props (the rules, the controlled layouts, what it tells) is the
+core's root binding (`createGridLayoutRootBinding`), which every adapter calls.
 
 | package | name | contains | depends on |
 |---|---|---|---|
 | `packages/core` | `@fragiola/grid-layout` | the layout rules (geometry, collision, move, compaction), the typed model and its commands, the engine that binds one grid to the DOM | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/grid-layout-react` | the `GridLayout.*` primitives and hooks over the core | peer `react`, `react-dom` (^19) |
+| `packages/vue` | `@fragiola/grid-layout-vue` | the same `GridLayout.*` primitives as Vue components, and the hooks as composables, over the core | peer `vue` (^3.5) |
 | `apps/playground` | private | the dev app (every site example live, with themes and source), unstyled fixture pages driven by Playwright | both packages, `examples/react`, `examples/shared` |
 | `examples/shared` | private | what every framework's examples share and no reader copies: each example's metadata, the themes, the embed protocol, the manifest builder and loader generator, every Playwright spec; imports no framework | |
-| `examples/react`, `site` | private | the site's React examples (the embed app) and pages, exported for fragiola.com | `examples/shared` |
+| `examples/react`, `examples/vue`, `site` | private | each framework's examples (one embed app per framework, same ids) and the pages, exported for fragiola.com | `examples/shared` |
 
 ## Non-negotiable rules
 
@@ -235,7 +238,7 @@ an implementation detail.
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `playground`, `examples-shared`, `examples-react`, `site` |
+| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `vue` (jsdom), `playground`, `examples-shared`, `examples-react`, `examples-vue`, `site` |
 | `pnpm bench` | Vitest benchmarks (informative, not a gate) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages, Vite for the apps), then the `.d.ts` check |
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
@@ -249,6 +252,7 @@ an implementation detail.
 ```
 packages/core/      @fragiola/grid-layout        src/<domain>/ (compactors, engine, layout, model), tests/ mirroring it
 packages/react/     @fragiola/grid-layout-react  src/components/, hooks/, utils/, compactors/; entries index.ts, parts.ts, context.ts
+packages/vue/       @fragiola/grid-layout-vue    src/components/, composables/, utils/, compactors/; entries index.ts, parts.ts, context.ts
 apps/playground/    src/shell/                   the shell: catalog, sidebar, toolbar, stage, source
                     src/fixture/                 what the fixture pages mount
                     fixtures/<name>/             unstyled pages Playwright drives
@@ -259,6 +263,8 @@ examples/shared/    src/meta/<slug>.ts           every example's metadata, whate
                     e2e/                         the Playwright specs every framework runs, also inside an iframe
 examples/react/     src/examples/<slug>/         the site's React examples (the embed app, Vite)
                     src/components, lib, …       Fragiola UI, vendored (scripts/vendor-fragiola.ts)
+examples/vue/       src/examples/<slug>/         the Vue examples (index.vue + styles.ts), same ids (a subset until Epic #38)
+                    src/lib, styles              copies of the React app's vendored files (tests/vendored.test.ts)
 site/               docs/                        the pages fragiola.com/grid-layout serves
                     export.ts, contract.ts       `pnpm site:export` and its validation
 scripts/                                         the `.d.ts` check, the size report, the source condition
@@ -406,13 +412,43 @@ Every primitive follows the same rules. Tests enforce them; keep it that way.
   props at its starting box, the engine writes its `transform` (and size) itself, and puts the box
   back when the gesture ends.
 
+### In Vue (`@fragiola/grid-layout-vue`)
+
+The same parts, names, `data-*` and behaviour, as Vue 3.5 components (render functions,
+`packages/vue/src/components`) and composables (`packages/vue/src/composables`), after Dockable's
+Vue adapter. What differs is only how Vue writes it:
+
+- `render` is `as="section"` (a tag or a component) or the `render` scoped slot
+  (`#render="{ props, state, children }"`); `className`/`style` are the `class` and `style`
+  attributes, merged under the structural style, with no function form (state-dependent looks use
+  the `data-*` attributes or the `render` slot's `state`).
+- Children functions are scoped slots: `Items` `v-slot="{ item }"`, `Cells` `v-slot="{ cell }"`,
+  the others `v-slot="{ state }"`.
+- Callbacks are props a listener sets (`@layout-change`, `@drag-start`, `@drop`, …);
+  `v-model:layout` and `v-model:layouts` pair the controlled props with `update:layout` and
+  `update:layouts`, once per committed change (D9).
+- Composables return computed refs: a part composable `{ state, props }` (bind `props.value`, its
+  listeners are `onPointerdown`/`onKeydown`, its `ref` a function template ref); `useGridLayout()`
+  inside a root returns the model and engine themselves.
+- A `gridLayoutRef` is unwrapped (`toRaw`) wherever it is read: a parent may keep it in reactive
+  state. `useGridLayoutRef()` marks it raw.
+- The root runs the core binding's steps in `onMounted` and `onUpdated`; a gesture renders nothing
+  unless the preview layout changes (D8), as in React (a test counts the renders).
+- The Vue examples (`examples/vue`) are single-file components (`index.vue`) with their classes in
+  `styles.ts`, bound with `:class` (no class string in a template, `tests/examples.test.ts`);
+  `vue-tsc` checks them with TypeScript 6.0, pinned in that app only (it does not run on 7 yet).
+- The docs show both frameworks with `<Framework name="react">` / `<Framework name="vue">`
+  blocks; `site/docs/api/vue.mdx` maps every React prop and hook to Vue.
+
 ## Site
 
 The docs and examples are served by `fragiola.com/grid-layout`, built by the `www` repo from this
 repo's **site export** (`../www/CONTRACT.md`, v1.2). This repo only provides: the pages
 (`site/docs`, base-free links, the v1.2 vocabulary), the gallery configuration (`examples.json`)
 and one examples app per framework of `site/project.json` (`examples/<framework>`, built for
-`<base>/embed/<framework>/`; React today), sharing `examples/shared`. `www` owns the shell,
+`<base>/embed/<framework>/`; React and Vue today), sharing `examples/shared`. A framework may ship a
+subset of the examples while it is written: the shared specs skip what it lacks, except for the
+frameworks of `COMPLETE_FRAMEWORKS` (`examples/shared/e2e/available.ts`). `www` owns the shell,
 the gallery chrome, the code panel and search. A page's `title` is at most 60 characters and
 never repeats "Grid Layout"; its `description` is 50–160 characters, plain words, no `: ` (YAML);
 a page body has no `#` and never skips a heading level; `pnpm site:export` checks all of it.

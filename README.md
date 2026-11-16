@@ -1,6 +1,6 @@
 # Grid Layout
 
-A headless grid layout for React: items on a grid of columns and rows that people drag and resize,
+A headless grid layout for React and Vue: items on a grid of columns and rows that people drag and resize,
 pushing each other out of the way and settling as they go. Dashboards, widget boards, bento
 layouts. It ships behaviour, accessibility and composable primitives, and no CSS, icons, handles
 or text: you bring the styling.
@@ -12,6 +12,7 @@ the layout is a command you can veto or rewrite.
 |---|---|
 | [`@fragiola/grid-layout`](packages/core) | framework-agnostic core: layout rules (collision, move, compaction), typed model and commands, the engine |
 | [`@fragiola/grid-layout-react`](packages/react) | composable React 19 primitives over the core |
+| [`@fragiola/grid-layout-vue`](packages/vue) | the same primitives as Vue 3.5 components and composables |
 
 Its behaviour follows [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout)
 (MIT), a study reference: see [LICENSE](LICENSE).

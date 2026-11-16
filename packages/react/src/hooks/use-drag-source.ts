@@ -1,12 +1,15 @@
 import {
     type DragSourceState,
+    type DropDetails,
     type DropItem,
     dragSourcePart,
+    dragSourceStatus,
+    dropDetailsOf,
     type ExternalDrop,
+    isDropFrom,
 } from "@fragiola/grid-layout";
 import type * as React from "react";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { type DropDetails, dropDetailsOf } from "../utils/drop-details";
 import { type GridLayoutRef, noSubscription } from "../utils/grid-layout-ref";
 import { useGrid } from "./internal";
 import type { PartHookResult } from "./use-item";
@@ -55,14 +58,8 @@ export function useDragSource(
     const disabled = options.disabled === true;
     // only this source's part of the view: a gesture elsewhere renders nothing here (and the
     // check allocates nothing, on every view change of every source)
-    const statusNow = () => {
-        const gesture = engine?.adapter.getView().gesture;
-        return gesture?.kind === "drop" &&
-            element.current !== null &&
-            gesture.origin === element.current
-            ? gesture.source
-            : "";
-    };
+    const statusNow = () =>
+        dragSourceStatus(engine?.adapter.getView(), element.current);
     useSyncExternalStore(
         engine ? engine.adapter.subscribe : noSubscription,
         statusNow,
@@ -84,12 +81,7 @@ export function useDragSource(
     useEffect(
         () =>
             engine?.subscribe((event) => {
-                if (
-                    event.type === "drop" &&
-                    event.external &&
-                    event.origin !== undefined &&
-                    event.origin === element.current
-                ) {
+                if (isDropFrom(event, element.current)) {
                     latest.current.onDrop?.(dropDetailsOf(event));
                 }
             }),
