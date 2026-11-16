@@ -13,7 +13,7 @@ import {
     fixtures,
     repositoryPath,
     sections,
-} from "../src/catalog.ts";
+} from "../src/shell/catalog.ts";
 
 // The catalog reads examples/react where it lives: every example it lists is one the site shows,
 // none is missing, and there is no second list to keep in step.
@@ -90,14 +90,14 @@ describe("the fixtures", () => {
 
 describe("paths", () => {
     it("reads the example of a file, skipping `_` folders and loose files", () => {
-        const base = "../../../examples/react/src/examples";
+        const base = "../../../../examples/react/src/examples";
         expect(exampleSlug(`${base}/hello-grid/index.tsx`)).toBe("hello-grid");
         expect(exampleSlug(`${base}/_kit/data.ts`)).toBeUndefined();
         expect(exampleSlug(`${base}/meta-types.ts`)).toBeUndefined();
     });
 
     it("writes glob keys from the repository root", () => {
-        expect(repositoryPath("../../../examples/react/src/x.ts")).toBe(
+        expect(repositoryPath("../../../../examples/react/src/x.ts")).toBe(
             "examples/react/src/x.ts",
         );
     });

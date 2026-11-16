@@ -48,25 +48,25 @@ export type Fixture = { name: string; title: string; href: string };
 
 // Glob keys are relative to this file, which is apps/playground/src.
 export function repositoryPath(key: string): string {
-    return new URL(key, "file:///apps/playground/src/").pathname.slice(1);
+    return new URL(key, "file:///apps/playground/src/shell/").pathname.slice(1);
 }
 
 // ─── Examples ───────────────────────────────────────────────────────────────
 
-const EXAMPLES = "../../../examples/react/src/examples";
+const EXAMPLES = "../../../../examples/react/src/examples";
 
 const exampleModules = import.meta.glob<{ default: ComponentType }>(
-    "../../../examples/react/src/examples/*/index.tsx",
+    "../../../../examples/react/src/examples/*/index.tsx",
 );
 const exampleMetas = import.meta.glob<{ default: ExampleMeta }>(
-    "../../../examples/react/src/examples/*/meta.ts",
+    "../../../../examples/react/src/examples/*/meta.ts",
     { eager: true },
 );
 const exampleSources = import.meta.glob<string>(
     [
-        "../../../examples/react/src/examples/*/*.{ts,tsx,css}",
-        "!../../../examples/react/src/examples/_*/**",
-        "!../../../examples/react/src/examples/*/meta.ts",
+        "../../../../examples/react/src/examples/*/*.{ts,tsx,css}",
+        "!../../../../examples/react/src/examples/_*/**",
+        "!../../../../examples/react/src/examples/*/meta.ts",
     ],
     { query: "?raw", import: "default" },
 );
@@ -158,7 +158,7 @@ export function findEntry(ref: ItemRef | null): Entry | undefined {
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
-const fixturePages = import.meta.glob<string>("../fixtures/*/index.html", {
+const fixturePages = import.meta.glob<string>("../../fixtures/*/index.html", {
     query: "?raw",
     import: "default",
     eager: true,
@@ -167,7 +167,9 @@ const fixturePages = import.meta.glob<string>("../fixtures/*/index.html", {
 /** Each fixture page, titled by its `<title>`; each opens with its own default layout. */
 export const fixtures: Fixture[] = Object.entries(fixturePages)
     .flatMap(([key, html]) => {
-        const name = /^\.\.\/fixtures\/([^/]+)\/index\.html$/.exec(key)?.[1];
+        const name = /^\.\.\/\.\.\/fixtures\/([^/]+)\/index\.html$/.exec(
+            key,
+        )?.[1];
         if (!name) return [];
         const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? name;
         return [{ name, title, href: `/fixtures/${name}/` }];
