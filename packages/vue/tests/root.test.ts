@@ -1,6 +1,6 @@
-import type { Layout } from "@fragiola/grid-layout";
+import type { GridLayoutModel, Layout } from "@fragiola/grid-layout";
 import { describe, expect, it, vi } from "vitest";
-import { defineComponent, h, nextTick, ref } from "vue";
+import { defineComponent, h, isProxy, nextTick, ref } from "vue";
 import {
     GridLayout,
     type GridLayoutContextValue,
@@ -89,6 +89,50 @@ describe("GridLayout.Root", () => {
         await press.release(...cell(2, 0));
         await nextTick();
         expect(box("b").style.transform).toBe("translate(208px, 130px)");
+    });
+
+    it("controlled: the model keeps no reactive proxy, and tells layouts the parent owns", async () => {
+        stubBrowser();
+        let told: Layout | undefined;
+        let layout: ReturnType<typeof ref<Layout>> | undefined;
+        let model: GridLayoutModel | undefined;
+        const Probe = defineComponent({
+            setup() {
+                model = useGridLayout().model;
+                return () => null;
+            },
+        });
+        const Parent = defineComponent({
+            setup() {
+                layout = ref<Layout>(two);
+                return () =>
+                    h(
+                        GridLayout.Root,
+                        {
+                            cols: 12,
+                            rowHeight: 50,
+                            width: 1200,
+                            layout: layout?.value,
+                            "onUpdate:layout": (next: Layout) => {
+                                told = next;
+                                if (layout) layout.value = next;
+                            },
+                        },
+                        () => h(Probe),
+                    );
+            },
+        });
+        mountInDocument(Parent);
+        expect(isProxy(model?.get("layout"))).toBe(false);
+        model?.run("item.move", { itemId: "a", x: 4, y: 0 });
+        await nextTick();
+        expect(told).toBeDefined();
+        expect(told).not.toBe(model?.get("layout"));
+        expect(() => structuredClone(told)).not.toThrow();
+        // the parent changing its own layout in place never reaches the committed one
+        const first = layout?.value?.[0] as { w: number } | undefined;
+        if (first) first.w = 9;
+        expect(model?.get("layout").find((item) => item.id === "a")?.w).toBe(2);
     });
 
     it("tells a corrected layout on mount, and nothing for a valid one", async () => {

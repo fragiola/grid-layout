@@ -119,6 +119,20 @@ const BOOLEANS = [
     "autoScroll",
 ] as const satisfies readonly (keyof RootProps)[];
 
+/** A layout the app owns: its own array and items, so changing them never reaches the model. */
+function copyLayout(layout: Layout): Layout {
+    return layout.map((item) => ({ ...item }));
+}
+
+/** Layouts per breakpoint the app owns, each copied as `copyLayout` does. */
+function copyLayouts(
+    layouts: Readonly<Record<string, Layout>>,
+): Readonly<Record<string, Layout>> {
+    return Object.fromEntries(
+        Object.entries(layouts).map(([name, each]) => [name, copyLayout(each)]),
+    );
+}
+
 /** The grid layout: a positioned box its items are placed in, as tall as the layout. */
 export const Root: GridLayoutComponent<RootProps, RootSlots> = definePrimitive<
     RootProps,
@@ -128,12 +142,21 @@ export const Root: GridLayoutComponent<RootProps, RootSlots> = definePrimitive<
     PROPS,
     (props, { attrs, slots }) => {
         // the props as the core reads them: the layout told to `v-model` as well
+        // The layouts go in raw (a parent's `ref` hands a reactive proxy, which the model must
+        // not keep) and come out as copies (a parent that mutates its `ref` in place must not
+        // reach the model's committed layout, D3): the model is changed only by commands.
         const read = (): GridLayoutRootOptions => ({
             ...props,
+            layout: props.layout && toRaw(props.layout),
+            layouts: props.layouts && toRaw(props.layouts),
+            defaultLayout: props.defaultLayout && toRaw(props.defaultLayout),
+            defaultLayouts: props.defaultLayouts && toRaw(props.defaultLayouts),
             onLayoutChange: (layout, layouts) => {
-                props["onUpdate:layout"]?.(layout);
-                props["onUpdate:layouts"]?.(layouts);
-                props.onLayoutChange?.(layout, layouts);
+                const own = copyLayout(layout);
+                const ownLayouts = copyLayouts(layouts);
+                props["onUpdate:layout"]?.(own);
+                props["onUpdate:layouts"]?.(ownLayouts);
+                props.onLayoutChange?.(own, ownLayouts);
             },
         });
         // the model and the engine, made from the first props; the steps below keep them in line

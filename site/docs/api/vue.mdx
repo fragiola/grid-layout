@@ -44,6 +44,8 @@ const layout = ref<Layout>([
 </template>
 ```
 
+The layout `v-model` gives you is your own copy: changing it never reaches the grid. To add, remove or move an item, give the root a new array (`layout.value = [...layout.value, item]`) or run a command (`model.run("item.add", …)`); changing the array in place is not seen.
+
 ## How React's props map
 
 | React | Vue |
