@@ -130,4 +130,16 @@ describe("the Vue kit", () => {
             ).not.toContain("@fragiola/grid-layout-vue");
         }
     });
+
+    it("holds no styles: classes live in each example's styles.ts", () => {
+        for (const file of walk(join(EXAMPLES_DIR, "_kit"))) {
+            if (!file.endsWith(".vue")) continue;
+            const source = readFileSync(file, "utf-8");
+            const template = source.slice(source.indexOf("<template>"));
+            expect(
+                /\sclass="|\bcn\(/.test(template),
+                relative(EXAMPLES_DIR, file),
+            ).toBe(false);
+        }
+    });
 });
