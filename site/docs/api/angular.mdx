@@ -1,0 +1,186 @@
+---
+title: Angular directives
+description: The same primitives and hooks for Angular, from @fragiola/grid-layout-angular, and how each React prop maps onto directives, inputs, outputs and templates.
+---
+
+`@fragiola/grid-layout-angular` has every primitive of the React package as a standalone
+directive on an element you write, and every hook as an injection function, over the same core
+(re-exported whole). The behaviour, the `data-*` attributes and the ARIA of every element are the
+same, so every page of these docs applies: this page says how the React API is written in Angular.
+
+```ts
+import {
+    createGridLayoutRef,
+    GRID_LAYOUT,
+    injectGridLayout,
+    type Layout,
+} from "@fragiola/grid-layout-angular";
+```
+
+`GRID_LAYOUT` lists every directive, for a standalone component's `imports`. The package is
+standalone only (no NgModule) and built on signals: it needs no zone.js (zoneless is Angular's
+default). It needs `@angular/core` **^22**.
+
+## A grid in a template
+
+```ts title="dashboard.ts"
+import { Component, signal } from "@angular/core";
+import { GRID_LAYOUT, type Layout } from "@fragiola/grid-layout-angular";
+
+@Component({
+    selector: "app-dashboard",
+    imports: [GRID_LAYOUT],
+    template: `
+        <div gridLayoutRoot [(layout)]="layout" [cols]="12" [rowHeight]="64" aria-label="Dashboard">
+            <ng-template gridLayoutItems let-item>
+                <div [gridLayoutItem]="item.id" [attr.aria-label]="item.id" class="card">
+                    {{ item.id }}
+                    <div
+                        *gridLayoutResizeHandle="'bottom-end'"
+                        [attr.aria-label]="'Resize ' + item.id"
+                        class="corner"
+                    ></div>
+                </div>
+            </ng-template>
+            <div *gridLayoutPlaceholder class="placeholder"></div>
+        </div>
+    `,
+})
+export class Dashboard {
+    protected readonly layout = signal<Layout>([
+        { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+        { id: "orders", x: 4, y: 0, w: 4, h: 2 },
+    ]);
+}
+```
+
+The layout `[(layout)]` gives you is your own copy: changing it never reaches the grid. To add,
+remove or move an item, set a new array (`layout.set([...layout(), item])`) or run a command
+(`model.run("item.add", …)`).
+
+## The element is yours
+
+A directive goes on the element you choose: `<section [gridLayoutItem]="item.id" class="…">`. It
+adds the part's `data-*` state, its listeners, its tab stop and its structural inline style; your
+`class`, your other attributes and your listeners stay as they are. The structural style keys win
+over a static `style` you write on the element; a `[style.x]` binding of yours on a structural key
+would fight the part, so leave those keys to it.
+
+Each part's state is a signal, `state()`, through `exportAs` (`gridLayoutRoot`, `gridLayoutItem`,
+`gridLayoutDragHandle`, `gridLayoutDragSource`): React's `className={(state) => …}` is a binding of
+yours on the element.
+
+```html
+<div [gridLayoutItem]="item.id" #part="gridLayoutItem" [class.held]="part.state().dragging">
+    {{ item.id }}
+</div>
+```
+
+Your `(pointerdown)` and `(keydown)` listeners run before the engine's, so `preventDefault`
+vetoes a gesture or replaces a key, as in React.
+
+## Template directives
+
+React's children functions, and the parts that are present only at times, are template
+directives: an `<ng-template>`, or the `*` form on your element. The part is written onto the
+template's first element.
+
+| template directive | renders | context (`let-…`) |
+| --- | --- | --- |
+| `<ng-template gridLayoutItems let-item>` (`*gridLayoutItems="let item"`) | once per item of the layout, keyed by its id, once the root has a width | `$implicit` and `item`: a `LayoutItem` (`ItemsContext`) |
+| `*gridLayoutCells="let cell; rows: 4"` | one element per cell, row by row; `rows` is a number or `auto` (the default) | `$implicit` and `cell`: a `CellState` (`CellsContext`) |
+| `*gridLayoutPlaceholder="let state"` | the placeholder, only during a gesture | `$implicit` and `state`: a `PlaceholderState` (`PartContext`) |
+| `*gridLayoutResizeHandle="'bottom-end'; itemId: id; let state"` | the handle, only while its item can be resized | `$implicit` and `state`: a `ResizeHandleState` |
+| `*gridLayoutDragPreview="gridLayoutRef; let state"` | the drag preview, only during a pointer drop; the ref is needed outside the root | `$implicit` and `state`: a `DragPreviewState` (its `data`) |
+
+A template directive on a plain element (not a template) throws, with the form to write.
+
+## How React's props map
+
+| React | Angular |
+| --- | --- |
+| `GridLayout` namespace | `GRID_LAYOUT`, every directive, for `imports` |
+| `GridLayout.Root` | `[gridLayoutRoot]` (`exportAs: "gridLayoutRoot"`, `state()`) |
+| `GridLayout.Items` (children function) | `<ng-template gridLayoutItems let-item>` / `*gridLayoutItems="let item"` |
+| `GridLayout.Item itemId` | `[gridLayoutItem]="item.id"` (`exportAs: "gridLayoutItem"`) |
+| `GridLayout.DragHandle itemId?` | `gridLayoutDragHandle` / `[gridLayoutDragHandle]="id"` |
+| `GridLayout.ResizeHandle side itemId?` | `*gridLayoutResizeHandle="'bottom-end'; itemId: id; let state"` |
+| `GridLayout.Placeholder` | `*gridLayoutPlaceholder="let state"` |
+| `GridLayout.Cells rows` | `*gridLayoutCells="let cell; rows: 4"` |
+| `GridLayout.DragSource item itemId data dragOffset disabled gridLayoutRef onDrop` | `[gridLayoutDragSource]="{ w, h }"` with `[itemId]`, `[data]`, `[dragOffset]`, `[disabled]`, `[gridLayoutRef]`, `(dropped)` |
+| `GridLayout.DragPreview gridLayoutRef` | `*gridLayoutDragPreview="gridLayoutRef; let state"` |
+| `Root` props (`layout`, `defaultLayout`, `layouts`, `defaultLayouts`, `breakpoints`, `breakpoint`, `defaultBreakpoint`, `cols`, `maxRows`, `compactor`, `preventCollision`, `allowOverlap`, `constraints`, `constraintRegistry`, `rowHeight`, `gap`, `padding`, `autoSize`, `width`, `draggable`, `resizable`, `bounded`, `threshold`, `touchDelay`, `touchTolerance`, `autoScroll`, `dir`, `scale`, `gridLayoutRef`, `createId`) | inputs of the same names; a boolean or number input also takes an attribute (`bounded`, `maxRows="8"`) |
+| `onLayoutChange(layout, layouts)` | `(layoutChange)` gives the `Layout`, `(layoutsChange)` every breakpoint's; `[(layout)]` and `[(layouts)]` bind both ways, once per committed change |
+| `onBreakpointChange(name, cols)` | `(breakpointChange)` gives `{ breakpoint, cols }` (`BreakpointChange`) |
+| `onDragStart`, `onDrag`, `onDragStop` | `(dragStart)`, `(dragMove)`, `(dragStop)` |
+| `onResizeStart`, `onResize`, `onResizeStop` | `(resizeStart)`, `(resizeMove)`, `(resizeStop)` |
+| `onDrop` | `(dropped)`, on the root and on a source |
+| `onExternalDrag` | the input `[externalDrag]`: it answers, so it is a function, not an output |
+| `render={<section />}` | the element you put the directive on |
+| `render={(props, state) => …}`, `className` or `style` as `(state) => value` | your bindings on your element, reading `state()` through `exportAs` (`#i="gridLayoutItem"`, `[class.held]="i.state().dragging"`), or a `data-*` selector |
+| `useGridLayout()` / `useGridLayout(ref)` | `injectGridLayout()`, a `Signal<{ model, engine }>`; with a ref, `Signal<… \| null>` |
+| `useGridLayoutView()` / `(ref)` | `injectGridLayoutView()`, a `Signal<GridLayoutView>` (`\| undefined` with a ref) |
+| `useGridLayoutEvents(listener, ref?)` | `injectGridLayoutEvents(listener, ref?)` |
+| `useItems()`, `useGesture()` | `injectItems()`, `injectGesture()` (signals) |
+| `useBreakpoint(ref?)` | `injectBreakpoint(ref?)`, a `Signal<BreakpointInfo>` |
+| `useCells(rows)`, `usePlaceholder()`, `useDragPreview(ref?)` | `injectCells(rows)`, `injectPlaceholder()`, `injectDragPreview(ref?)`: signals of the core's parts |
+| `useItem`, `useDragHandle`, `useResizeHandle`, `useDragSource` | `injectItem()`, `injectDragHandle()`, `injectResizeHandle()`, `injectDragSource()`: `{ state }` of the enclosing directive |
+| `useGridLayoutRef()` | `createGridLayoutRef()`, from the core |
+| `@fragiola/grid-layout-react/compactors` | `@fragiola/grid-layout-angular/compactors` |
+
+`drag`, `resize` and `drop` are native events of the element, hence `dragMove`, `resizeMove` and
+`dropped`.
+
+## Directives
+
+| directive | selector | inputs | outputs |
+| --- | --- | --- | --- |
+| `GridLayoutRoot` | `[gridLayoutRoot]` | the `Root` props above, `externalDrag` | `layoutChange`, `layoutsChange`, `breakpointChange`, `dragStart`, `dragMove`, `dragStop`, `resizeStart`, `resizeMove`, `resizeStop`, `dropped` |
+| `GridLayoutItems` | `[gridLayoutItems]` (a template) | none | |
+| `GridLayoutItem` | `[gridLayoutItem]` | `gridLayoutItem` (the item's id) | |
+| `GridLayoutDragHandle` | `[gridLayoutDragHandle]` | `gridLayoutDragHandle` (the item's id, optional inside an item) | |
+| `GridLayoutResizeHandle` | `[gridLayoutResizeHandle]` (a template) | `gridLayoutResizeHandle` (the side), `itemId` | |
+| `GridLayoutPlaceholder` | `[gridLayoutPlaceholder]` (a template) | none | |
+| `GridLayoutCells` | `[gridLayoutCells]` (a template) | `rows` | |
+| `GridLayoutDragSource` | `[gridLayoutDragSource]` | `gridLayoutDragSource` (`{ w, h, minW?, maxW?, minH?, maxH? }`), `itemId`, `data`, `dragOffset`, `disabled`, `gridLayoutRef` | `dropped` |
+| `GridLayoutDragPreview` | `[gridLayoutDragPreview]` (a template) | `gridLayoutDragPreview` (a `gridLayoutRef`, optional inside the root) | |
+
+The root makes the grid from its first inputs: changing them later configures it (the rules, the
+geometry), as the React props do. The engine attaches after the first render, once the element is
+in the document.
+
+## Injection functions
+
+The hooks of the React package, as injection functions: call them in an injection context (a
+constructor or a field initializer) and read their signals once the inputs are set (in a
+template, a `computed`, an effect, a handler). Reading `injectGridLayout()()` in a constructor
+throws: the root makes the grid in `ngOnInit`.
+
+| function | returns |
+| --- | --- |
+| `injectGridLayout()` / `injectGridLayout(ref)` | `Signal<{ model, engine }>` / `Signal<{ model, engine } \| null>`, `null` until a root holds the ref |
+| `injectGridLayoutView()` / `(ref)` | `Signal<GridLayoutView>` / `Signal<GridLayoutView \| undefined>` |
+| `injectGridLayoutEvents(listener, ref?)` | nothing: the listener gets every gesture event (pointer, keyboard and drops) until the component is destroyed |
+| `injectItems()` | `Signal<Layout>`: the committed layout |
+| `injectGesture()` | `Signal<GestureView \| undefined>` |
+| `injectBreakpoint(ref?)` | `Signal<BreakpointInfo>` (`{ breakpoint, cols, width }`) |
+| `injectCells(rows?)` | `Signal<readonly Part<CellState>[]>` |
+| `injectPlaceholder()` | `Signal<Part<PlaceholderState> \| undefined>` |
+| `injectDragPreview(ref?)` | `Signal<Part<DragPreviewState> \| undefined>` |
+| `injectItem()`, `injectDragHandle()`, `injectResizeHandle()`, `injectDragSource()` | the enclosing directive's `{ state }`, an `InjectPartResult` |
+
+## Opt-in compactors
+
+The core's opt-in compactors are the `/compactors` entry, as in React:
+
+```ts
+import { fastVerticalCompactor } from "@fragiola/grid-layout-angular/compactors";
+```
+
+## Building
+
+The package is in the Angular Package Format (partial compilation, ESM only), built with
+ng-packagr: an app's Angular compiler links it, whatever builds the app (the Angular CLI, or Vite
+with `@analogjs/vite-plugin-angular`). The Angular compiler runs on TypeScript `>=6.0 <6.1`.
+
+<Example id="hello-grid" />

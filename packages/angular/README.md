@@ -40,4 +40,6 @@ hooks as injection functions (`injectGridLayout`, `injectBreakpoint`, …), and 
 re-exported; `@fragiola/grid-layout-angular/compactors` re-exports the core's compactors. Needs
 `@angular/core` ^22; standalone, signals, zoneless; ESM only (Angular Package Format).
 
-Docs and examples: <https://fragiola.com/grid-layout>. MIT, see [LICENSE](LICENSE).
+How each React prop and hook is written in Angular:
+<https://fragiola.com/grid-layout/docs/api/angular>. Docs and examples:
+<https://fragiola.com/grid-layout>. MIT, see [LICENSE](LICENSE).

@@ -15,6 +15,8 @@ the layout is a command you can veto or rewrite.
 | [`@fragiola/grid-layout-vue`](packages/vue) | the same primitives as Vue 3.5 components and composables |
 | [`@fragiola/grid-layout-angular`](packages/angular) | the same primitives as Angular 22 attribute directives and injection functions |
 
+Docs and examples, in React, Vue and Angular: <https://fragiola.com/grid-layout>.
+
 Its behaviour follows [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout)
 (MIT), a study reference: see [LICENSE](LICENSE).
 
