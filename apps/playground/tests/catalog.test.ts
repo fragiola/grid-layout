@@ -2,10 +2,11 @@ import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+    examplesApp,
     listExampleSlugs,
     loadExamples,
-} from "../../../examples/react/scripts/examples-lib.ts";
-import { CATEGORIES } from "../../../examples/react/src/examples/meta-types.ts";
+} from "../../../examples/shared/scripts/examples-lib.ts";
+import { CATEGORIES } from "../../../examples/shared/src/meta-types.ts";
 import {
     entries,
     exampleSlug,
@@ -13,17 +14,18 @@ import {
     fixtures,
     repositoryPath,
     sections,
-} from "../src/catalog.ts";
+} from "../src/shell/catalog.ts";
 
 // The catalog reads examples/react where it lives: every example it lists is one the site shows,
 // none is missing, and there is no second list to keep in step.
 
-const examples = await loadExamples();
+const REACT = examplesApp("react");
+const examples = await loadExamples(REACT);
 
 describe("the catalog", () => {
     it("lists every example of examples/react once, and no `_` folder", () => {
         const listed = entries.map((e) => e.id).sort();
-        expect(listed).toEqual(listExampleSlugs());
+        expect(listed).toEqual(listExampleSlugs(REACT));
         expect(listed.some((id) => id.startsWith("_"))).toBe(false);
     });
 
@@ -90,14 +92,14 @@ describe("the fixtures", () => {
 
 describe("paths", () => {
     it("reads the example of a file, skipping `_` folders and loose files", () => {
-        const base = "../../../examples/react/src/examples";
+        const base = "../../../../examples/react/src/examples";
         expect(exampleSlug(`${base}/hello-grid/index.tsx`)).toBe("hello-grid");
         expect(exampleSlug(`${base}/_kit/data.ts`)).toBeUndefined();
         expect(exampleSlug(`${base}/meta-types.ts`)).toBeUndefined();
     });
 
     it("writes glob keys from the repository root", () => {
-        expect(repositoryPath("../../../examples/react/src/x.ts")).toBe(
+        expect(repositoryPath("../../../../examples/react/src/x.ts")).toBe(
             "examples/react/src/x.ts",
         );
     });
