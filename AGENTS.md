@@ -230,7 +230,8 @@ an implementation detail.
 | command | does |
 |---|---|
 | `pnpm install` | install dependencies |
-| `pnpm check` | Biome lint + format + assist (non-mutating) |
+| `pnpm check` | Biome lint + format + assist (non-mutating), then `check:layout` |
+| `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
 | `pnpm test` | Vitest: `core` (node), `react` (jsdom), `playground`, `examples-react`, `site` |
@@ -245,9 +246,10 @@ an implementation detail.
 ## Repository layout
 
 ```
-packages/core/      @fragiola/grid-layout        src/, tests/
-packages/react/     @fragiola/grid-layout-react  src/, tests/
-apps/playground/    src/                         the shell: catalog, sidebar, toolbar, stage, source
+packages/core/      @fragiola/grid-layout        src/<domain>/ (compactors, engine, layout, model), tests/ mirroring it
+packages/react/     @fragiola/grid-layout-react  src/components/, hooks/, utils/, compactors/; entries index.ts, parts.ts, context.ts
+apps/playground/    src/shell/                   the shell: catalog, sidebar, toolbar, stage, source
+                    src/fixture/                 what the fixture pages mount
                     fixtures/<name>/             unstyled pages Playwright drives
                     e2e/, tests/                 Playwright specs, unit tests
 examples/react/     src/examples/<slug>/         the site's examples (the embed app, Vite)
@@ -294,6 +296,14 @@ that pins it.
 - Commits are gitmoji-conventional: `✨ feat(core): …`, `🐛 fix(react): …`,
   `✅ test(core): …`, `🔧 chore: …`, `📝 docs: …`.
 - Branches: `<type>/epic-<n>-<short-description>`; one worktree per Epic under `.worktrees/`.
+- **Source layout** (guidelines `repository.md#source-layout`, enforced by `pnpm check:layout`):
+  every file and folder name is kebab-case (the kebab-case of its main export:
+  `useDragSource` → `use-drag-source.ts`); a `src/` is never flat: its root holds only the entries
+  (`index.ts`, `parts.ts`, `context.ts`), everything else lives in a folder named after what it
+  holds (React: `components/`, `hooks/`, `utils/`; an opt-in subpath such as `/compactors` gets its
+  own folder). One public component, hook or function per file, with its types beside it; hooks
+  only the primitives call live in `hooks/internal.ts`. No barrel files inside the folders. A
+  reorganization is its own change: `git mv`, code moved verbatim, the built declarations unchanged.
 - Unit tests live in each package's `tests/`, mirroring `src/`; type fixtures in `tests/types/`.
 - Every exported member has a one-line `/** … */`; a file opens with a `//` header when its
   purpose or a design choice is not obvious from its name.
