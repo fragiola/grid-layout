@@ -196,7 +196,27 @@ export const Root: GridLayoutComponent<RootProps, RootSlots> = definePrimitive<
             binding.syncLayouts();
             binding.syncLayout();
         };
+        // The engine measures the root as it attaches: Vue sets a ref while it mounts, before the
+        // tree is in the document (a width of 0 until the next resize frame, and a native drag
+        // in that window would find a grid not measured yet). So the root attaches once the
+        // component is mounted, as React's ref does after its commit.
+        let mounted = false;
+        let pending: HTMLElement | undefined;
+        let detach: (() => void) | undefined;
+        const attach = elementRef((element) => {
+            if (mounted) return engine.adapter.attach(element);
+            pending = element;
+            return () => {
+                if (pending === element) pending = undefined;
+                detach?.();
+                detach = undefined;
+            };
+        });
         onMounted(() => {
+            // the root first, as React attaches it before its effects run
+            mounted = true;
+            if (pending) detach = engine.adapter.attach(pending);
+            pending = undefined;
             binding.setOptions();
             holdRef();
             // controlled: a change the parent does not take is undone at its next render, which
@@ -217,7 +237,6 @@ export const Root: GridLayoutComponent<RootProps, RootSlots> = definePrimitive<
             heldRef = undefined;
         });
 
-        const attach = elementRef((element) => engine.adapter.attach(element));
         const part = computed(() => rootPart(view.value));
         return () => {
             const { state, attributes, style } = part.value;
