@@ -10,7 +10,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { createDevProxy, freePort, type Upstream } from "./dev-proxy.ts";
+import { createDevProxy, freePorts, type Upstream } from "./dev-proxy.ts";
 import { embedBuilds, frameworksOf, readProject } from "./sources.ts";
 
 const { values } = parseArgs({
@@ -45,8 +45,11 @@ const stop = (code: number) => {
 };
 
 // the out directory is unused in dev: only the package and the base of each embed matter
-for (const embed of embedBuilds(frameworksOf(readProject()), base, "")) {
-    const upstream = { prefix: embed.base, port: await freePort() };
+const embeds = embedBuilds(frameworksOf(readProject()), base, "");
+// every port is chosen before any dev server starts: nothing is left running if that fails
+const ports = await freePorts(embeds.length);
+for (const [index, embed] of embeds.entries()) {
+    const upstream = { prefix: embed.base, port: ports[index] ?? 0 };
     const child = spawn("pnpm", ["--filter", embed.package, "dev"], {
         cwd: resolve(import.meta.dirname, ".."),
         stdio: "inherit",
@@ -63,7 +66,14 @@ for (const embed of embedBuilds(frameworksOf(readProject()), base, "")) {
     upstreams.push(upstream);
 }
 
-createDevProxy(upstreams).listen(port, () => {
+const proxy = createDevProxy(upstreams);
+// the port taken (another site:dev, an examples dev server): stop the dev servers it started
+proxy.on("error", (error) => {
+    console.error(`site:dev: ${error.message}`);
+    stop(1);
+});
+// localhost only, as vite's own dev server: the dev site is not served on the network
+proxy.listen(port, "localhost", () => {
     for (const upstream of upstreams) {
         console.log(
             `site:dev: http://localhost:${port}${upstream.prefix} → dev server on ${upstream.port}`,

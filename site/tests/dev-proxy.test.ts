@@ -2,7 +2,7 @@
 import { createServer, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDevProxy, freePort, routeOf } from "../dev-proxy.ts";
+import { createDevProxy, freePorts, routeOf } from "../dev-proxy.ts";
 
 // `site:dev` serves every framework's embed on one port: a proxy in front of one dev server per
 // framework, routing by `<base>/embed/<framework>/`, hot-reload WebSockets included.
@@ -57,7 +57,7 @@ describe("the dev proxy", () => {
 
     /** A dev server that names itself, answers the path it got and echoes on an upgrade. */
     async function upstream(name: string): Promise<number> {
-        const port = await freePort();
+        const [port = 0] = await freePorts(1);
         const server = createServer((request, response) => {
             response.setHeader("x-upstream", name);
             response.end(`${name} ${request.url}`);
@@ -82,7 +82,7 @@ describe("the dev proxy", () => {
             { prefix: "/grid-layout/embed/react/", port: react },
             { prefix: "/grid-layout/embed/vue/", port: vue },
         ]);
-        const port = await freePort();
+        const [port = 0] = await freePorts(1);
         await new Promise<void>((resolve) =>
             server.listen(port, "localhost", resolve),
         );
@@ -135,5 +135,14 @@ describe("the dev proxy", () => {
         });
         expect(reply).toMatch(/^HTTP\/1\.1 101 Switching Protocols/);
         expect(reply).toContain("vue:ping");
+    });
+});
+
+describe("freePorts", () => {
+    it("gives as many different ports as asked", async () => {
+        const ports = await freePorts(4);
+        expect(ports).toHaveLength(4);
+        expect(new Set(ports).size).toBe(4);
+        expect(ports.every((port) => port > 0)).toBe(true);
     });
 });

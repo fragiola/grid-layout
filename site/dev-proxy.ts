@@ -102,16 +102,33 @@ export function createDevProxy(upstreams: readonly Upstream[]): Server {
     return server;
 }
 
-/** A port nothing listens on right now, for a dev server behind the proxy. */
-export function freePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-        const probe = createNetServer();
-        probe.once("error", reject);
-        probe.listen(0, "localhost", () => {
-            const address = probe.address();
-            const port =
-                typeof address === "object" && address ? address.port : 0;
-            probe.close(() => resolve(port));
-        });
+/**
+ * `count` ports nothing listens on right now, all different, for the dev servers behind the
+ * proxy: every probe stays open until all are chosen, so two never get the same port.
+ */
+export async function freePorts(count: number): Promise<number[]> {
+    const probes = await Promise.all(
+        Array.from(
+            { length: count },
+            () =>
+                new Promise<ReturnType<typeof createNetServer>>(
+                    (resolve, reject) => {
+                        const probe = createNetServer();
+                        probe.once("error", reject);
+                        probe.listen(0, "localhost", () => resolve(probe));
+                    },
+                ),
+        ),
+    );
+    const ports = probes.map((probe) => {
+        const address = probe.address();
+        return typeof address === "object" && address ? address.port : 0;
     });
+    await Promise.all(
+        probes.map(
+            (probe) =>
+                new Promise<void>((resolve) => probe.close(() => resolve())),
+        ),
+    );
+    return ports;
 }
