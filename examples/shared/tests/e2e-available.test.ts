@@ -42,8 +42,8 @@ describe("a spec's examples", () => {
 describe("a complete framework", () => {
     const available = ["hello-grid"];
 
-    it("is React today: Vue and Angular ship a subset while they are written", () => {
-        expect(COMPLETE_FRAMEWORKS).toEqual(["react"]);
+    it("is React and Vue today: Angular ships a subset while it is written", () => {
+        expect(COMPLETE_FRAMEWORKS).toEqual(["react", "vue"]);
     });
 
     it("fails a spec whose example it lacks, instead of skipping it", () => {
@@ -54,8 +54,8 @@ describe("a complete framework", () => {
     });
 
     it("skips for a framework that is not complete yet", () => {
-        expect(skipOrFail("vue", available, ["drop-files"])).toBe(
-            "vue has no drop-files example",
+        expect(skipOrFail("angular", available, ["drop-files"])).toBe(
+            "angular has no drop-files example",
         );
     });
 });
