@@ -263,10 +263,18 @@ export class GridLayoutRoot implements GridLayoutContext, OnInit {
     constructor() {
         bindPart(this.host, () => this.part());
         // the element's `dir` is the input's, when it is given
+        // and goes when the input does, if the directive wrote it (an app's own `dir` stays)
+        let wroteDir = false;
         effect(() => {
             const dir = this.dir();
-            if (dir && this.host.getAttribute("dir") !== dir) {
-                this.host.setAttribute("dir", dir);
+            if (dir) {
+                if (this.host.getAttribute("dir") !== dir) {
+                    this.host.setAttribute("dir", dir);
+                }
+                wroteDir = true;
+            } else if (wroteDir) {
+                this.host.removeAttribute("dir");
+                wroteDir = false;
             }
         });
         // The engine measures the root as it attaches: once the page is rendered, the element is
@@ -291,8 +299,9 @@ export class GridLayoutRoot implements GridLayoutContext, OnInit {
         };
         afterRenderEffect(() => {
             const binding = this.bound();
-            // every input: a change runs the steps again
+            // every input: a change runs the steps again (the ref too, which `read` leaves out)
             this.read();
+            this.gridLayoutRef();
             this.forced();
             if (!binding) return;
             untracked(() => {

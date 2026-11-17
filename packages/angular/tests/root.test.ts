@@ -2,6 +2,7 @@ import { Component, input, type Signal, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { describe, expect, it, vi } from "vitest";
 import {
+    createGridLayoutRef,
     GRID_LAYOUT,
     type GridLayoutHandle,
     injectGridLayout,
@@ -615,5 +616,55 @@ describe("[gridLayoutRoot]", () => {
         expect(() => TestBed.createComponent(Early)).toThrow(
             /once they are set: read it in an effect, a computed or a handler/,
         );
+    });
+
+    it("follows a gridLayoutRef changed after mount, and releases the one it held", async () => {
+        stubBrowser();
+        const a = createGridLayoutRef();
+        const b = createGridLayoutRef();
+        const which = signal<typeof a | undefined>(a);
+        class Swap {
+            readonly layout = two;
+            readonly which = which;
+        }
+        Component({
+            selector: "t-swap-ref",
+            imports: [GRID_LAYOUT],
+            template: `<div gridLayoutRoot [width]="1200" [defaultLayout]="layout" [gridLayoutRef]="which()"></div>`,
+        })(Swap);
+        const fixture = await render(Swap);
+        expect(a.current).not.toBeNull();
+        which.set(b);
+        await fixture.whenStable();
+        await settle();
+        expect(a.current).toBeNull();
+        expect(b.current).not.toBeNull();
+        which.set(undefined);
+        await fixture.whenStable();
+        await settle();
+        expect(b.current).toBeNull();
+    });
+
+    it("drops the dir it wrote when the input goes back to none", async () => {
+        stubBrowser();
+        const dir = signal<"rtl" | undefined>("rtl");
+        class Direction {
+            readonly layout = two;
+            readonly dir = dir;
+        }
+        Component({
+            selector: "t-dir-toggle",
+            imports: [GRID_LAYOUT],
+            template: `<div gridLayoutRoot [width]="1200" [defaultLayout]="layout" [dir]="dir()"></div>`,
+        })(Direction);
+        const fixture = await render(Direction);
+        const root = (fixture.nativeElement as HTMLElement).querySelector(
+            "[data-grid-layout-part=root]",
+        );
+        expect(root?.getAttribute("dir")).toBe("rtl");
+        dir.set(undefined);
+        await fixture.whenStable();
+        await settle();
+        expect(root?.hasAttribute("dir")).toBe(false);
     });
 });
