@@ -115,7 +115,7 @@ export interface WrittenPart {
  * untouched until the part's value changes), an attribute the part drops is removed, and a style
  * key it drops gets the app's own value back. The structural keys win over the app's static
  * `style`: they are written after the element is created. Every other attribute and key is the
- * app's.
+ * app's, and so is a `tabindex` the app gives the element itself.
  */
 export class PartWriter {
     private readonly attributes = new Map<string, string>();
@@ -128,7 +128,7 @@ export class PartWriter {
     write(part: WrittenPart): void {
         const element = this.element;
         const attributes = new Map(Object.entries(part.attributes));
-        if (part.tabIndex !== undefined) {
+        if (part.tabIndex !== undefined && !this.appTabIndex()) {
             attributes.set("tabindex", String(part.tabIndex));
         }
         for (const name of this.attributes.keys()) {
@@ -159,6 +159,19 @@ export class PartWriter {
                 this.styles.set(name, value);
             }
         }
+    }
+
+    /**
+     * Whether the element's `tabindex` is the app's (`tabindex="-1"`, `[attr.tabindex]`): one the
+     * writer did not write. The app's wins, as its props do in React and its attributes in Vue;
+     * the writer then forgets its own, and never removes the app's.
+     */
+    private appTabIndex(): boolean {
+        const current = this.element.getAttribute("tabindex");
+        if (current === null || current === this.attributes.get("tabindex"))
+            return false;
+        this.attributes.delete("tabindex");
+        return true;
     }
 
     /** Takes everything written off the element: the attributes go, the app's style comes back. */

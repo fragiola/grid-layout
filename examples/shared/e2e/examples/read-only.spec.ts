@@ -6,6 +6,8 @@ test("shows the layout and never moves it", async ({ page }) => {
     await openExample(page, "read-only");
     const revenue = named(page, "Revenue");
     await expect(revenue).not.toHaveAttribute("data-draggable", "");
+    // out of the tab order: the app's tabindex wins over the item's
+    await expect(revenue).toHaveAttribute("tabindex", "-1");
     await expect(
         page.locator('[data-grid-layout-part="resize-handle"]'),
     ).toHaveCount(0);

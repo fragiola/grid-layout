@@ -13,7 +13,6 @@ export function injectGridLayoutEvents(
     gridLayoutRef?: GridLayoutRef,
 ): void {
     const grid = gridOf(
-        "injectGridLayoutEvents",
         () => gridLayoutRef,
         injectRootOrRef("injectGridLayoutEvents", gridLayoutRef),
     );

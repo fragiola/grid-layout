@@ -18,7 +18,6 @@ export function injectDragPreview(
 ): Signal<Part<DragPreviewState> | undefined> {
     const view = viewOf(
         gridOf(
-            "injectDragPreview",
             () => gridLayoutRef,
             injectRootOrRef("injectDragPreview", gridLayoutRef),
         ),

@@ -8,8 +8,20 @@ import {
     untracked,
 } from "@angular/core";
 import { type DragHandleState, dragHandlePart } from "@fragiola/grid-layout";
-import { injectGridLayoutContext, injectHandleItemId } from "../context";
+import {
+    injectGridLayoutContext,
+    injectHandleItemId,
+    requireHandleItemId,
+} from "../context";
 import { bindPart, injectHost, optionalId } from "../utils/helpers";
+
+/** A drag handle's state before its item is known (see `injectHandleItemId`). */
+const UNSET_HANDLE_STATE: DragHandleState = {
+    itemId: "",
+    dragging: false,
+    grabbed: false,
+    draggable: false,
+};
 
 /**
  * A drag handle, on the app's element: `<button gridLayoutDragHandle>` inside an item (or
@@ -28,21 +40,27 @@ export class GridLayoutDragHandle implements OnInit {
         "[gridLayoutDragHandle]",
     );
     private readonly host = injectHost();
-    private readonly itemId = injectHandleItemId("[gridLayoutDragHandle]", () =>
+    private readonly itemId = injectHandleItemId(() =>
         this.gridLayoutDragHandle(),
     );
 
-    private readonly part = computed(() =>
-        dragHandlePart(this.context.view(), this.itemId()),
-    );
+    private readonly part = computed(() => {
+        const itemId = this.itemId();
+        return itemId === undefined
+            ? undefined
+            : dragHandlePart(this.context.view(), itemId);
+    });
 
     /** what the handle shows as `data-*` */
-    readonly state: Signal<DragHandleState> = computed(() => this.part().state);
+    readonly state: Signal<DragHandleState> = computed(
+        () => this.part()?.state ?? UNSET_HANDLE_STATE,
+    );
 
     constructor() {
         bindPart(this.host, () => this.part());
         effect((onCleanup) => {
             const itemId = this.itemId();
+            if (itemId === undefined) return;
             const { engine } = this.context.handle();
             untracked(() =>
                 onCleanup(engine.adapter.registerDragHandle(itemId, this.host)),
@@ -52,6 +70,6 @@ export class GridLayoutDragHandle implements OnInit {
 
     ngOnInit(): void {
         // as early as React's: with its first inputs, not at the first render
-        this.itemId();
+        requireHandleItemId("[gridLayoutDragHandle]", this.itemId());
     }
 }

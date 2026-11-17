@@ -20,7 +20,6 @@ export function injectBreakpoint(
     gridLayoutRef?: GridLayoutRef,
 ): Signal<BreakpointInfo | undefined> {
     const grid = gridOf(
-        "injectBreakpoint",
         () => gridLayoutRef,
         injectRootOrRef("injectBreakpoint", gridLayoutRef),
     );

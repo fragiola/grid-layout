@@ -17,7 +17,7 @@ import {
 } from "@fragiola/grid-layout";
 import { injectOptionalGridLayoutContext } from "../context";
 import { bindPart } from "../utils/helpers";
-import { gridOf, viewOf } from "../utils/signals";
+import { gridOf, requireRootOrRef, viewOf } from "../utils/signals";
 import { type PartContext, presentView, requireTemplate } from "../utils/views";
 
 /** A `gridLayoutRef` input that takes a bare attribute as none. */
@@ -41,10 +41,10 @@ export class GridLayoutDragPreview implements OnInit {
         transform: optionalRef,
     });
 
+    private readonly around = injectOptionalGridLayoutContext();
     private readonly grid = gridOf(
-        "[gridLayoutDragPreview]",
         () => this.gridLayoutDragPreview(),
-        injectOptionalGridLayoutContext(),
+        this.around,
     );
     private readonly view = viewOf(this.grid);
     private readonly part = computed(() => dragPreviewPart(this.view()));
@@ -84,8 +84,12 @@ export class GridLayoutDragPreview implements OnInit {
     }
 
     ngOnInit(): void {
-        // inside a root or with a ref: a clear error as early as React's
-        this.grid();
+        // inside a root or with a ref: a clear error as early as React's, once the inputs are set
+        requireRootOrRef(
+            "[gridLayoutDragPreview]",
+            this.gridLayoutDragPreview(),
+            this.around,
+        );
     }
 
     static ngTemplateContextGuard(
