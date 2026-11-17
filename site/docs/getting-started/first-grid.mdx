@@ -1,6 +1,6 @@
 ---
 title: Your first grid
-description: From a layout of plain objects to a dashboard that drags, resizes and pushes, then styled from outside, in React or Vue.
+description: From a layout of plain objects to a dashboard that drags, resizes and pushes, then styled from outside, in React, Vue or Angular.
 ---
 
 This page builds the grid of the [`hello-grid`](/examples/hello-grid) example, step by step.
@@ -32,6 +32,20 @@ export const layout: Layout = [
 
 ```ts title="layout.ts"
 import type { Layout } from "@fragiola/grid-layout-vue";
+
+export const layout: Layout = [
+    { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
+    { id: "orders", x: 4, y: 0, w: 4, h: 2 },
+    { id: "visitors", x: 8, y: 0, w: 4, h: 2 },
+];
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="layout.ts"
+import type { Layout } from "@fragiola/grid-layout-angular";
 
 export const layout: Layout = [
     { id: "revenue", x: 0, y: 0, w: 4, h: 2 },
@@ -96,6 +110,35 @@ import { layout } from "./layout";
 
 </Framework>
 
+<Framework name="angular">
+
+In Angular, each part is a directive on an element you write: `gridLayoutRoot` on the grid, and
+an `<ng-template gridLayoutItems>` rendered once per item (`let-item`). `GRID_LAYOUT` lists every
+directive for the component's `imports`.
+
+```ts title="dashboard.ts"
+import { Component } from "@angular/core";
+import { GRID_LAYOUT } from "@fragiola/grid-layout-angular";
+import { layout } from "./layout";
+
+@Component({
+    selector: "app-dashboard",
+    imports: [GRID_LAYOUT],
+    template: `
+        <div gridLayoutRoot [defaultLayout]="layout" [cols]="12" [rowHeight]="64" [gap]="[12, 12]">
+            <ng-template gridLayoutItems let-item>
+                <div [gridLayoutItem]="item.id" [attr.aria-label]="item.id">{{ item.id }}</div>
+            </ng-template>
+        </div>
+    `,
+})
+export class Dashboard {
+    protected readonly layout = layout;
+}
+```
+
+</Framework>
+
 It already drags: press an item and move. It has no look: the next step gives it one.
 
 </Step>
@@ -133,6 +176,23 @@ held item would land. Neither has a look or a size of its own.
 
 </Framework>
 
+<Framework name="angular">
+
+The handle and the placeholder are rendered only at times (a handle while its item can be
+resized, the placeholder during a gesture), so they are template directives: the `*` form on
+your element.
+
+```html title="dashboard.ts (template)"
+<div [gridLayoutItem]="item.id" [attr.aria-label]="item.id" class="card">
+    {{ item.id }}
+    <div *gridLayoutResizeHandle="'bottom-end'" [attr.aria-label]="'Resize ' + item.id" class="corner"></div>
+</div>
+
+<div *gridLayoutPlaceholder class="placeholder"></div>
+```
+
+</Framework>
+
 </Step>
 
 <Step>
@@ -140,7 +200,9 @@ held item would land. Neither has a look or a size of its own.
 ## Style the parts
 
 Every part exposes its state as `data-*` attributes. In React, `className` also takes a function
-of the state; in Vue, `class` takes a value, and the `data-*` attributes carry the state.
+of the state; in Vue, `class` takes a value, and the `data-*` attributes carry the state; in
+Angular, the element is yours, and its `state()` signal is one `exportAs` away
+(`#part="gridLayoutItem"`, `[class.held]="part.state().dragging"`).
 
 ```css title="dashboard.css"
 .card { border: 1px solid #ddd; border-radius: 8px; background: white; cursor: grab; }
@@ -156,7 +218,7 @@ of the state; in Vue, `class` takes a value, and the `data-*` attributes carry t
 
 ## Keep the changes
 
-`onLayoutChange` (in Vue, `v-model:layout`) tells you the layout after every committed change, once: never during a
+`onLayoutChange` (in Vue, `v-model:layout`; in Angular, `[(layout)]`) tells you the layout after every committed change, once: never during a
 gesture. Save it, or hold the layout in your state and pass it as `layout`.
 
 <Framework name="react">
@@ -179,6 +241,20 @@ const layout = ref(start);
 <template>
     <GridLayout.Root v-model:layout="layout">…</GridLayout.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="dashboard.ts"
+@Component({
+    imports: [GRID_LAYOUT],
+    template: `<div gridLayoutRoot [(layout)]="layout">…</div>`,
+})
+export class Dashboard {
+    protected readonly layout = signal(start);
+}
 ```
 
 </Framework>

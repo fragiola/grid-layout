@@ -139,6 +139,17 @@
             ]
         },
         {
+            "label": "API: Angular (@fragiola/grid-layout-angular)",
+            "collapsible": true,
+            "defaultOpen": false,
+            "pages": [
+                {
+                    "label": "Angular directives",
+                    "path": "api/angular"
+                }
+            ]
+        },
+        {
             "label": "Project",
             "pages": [
                 {

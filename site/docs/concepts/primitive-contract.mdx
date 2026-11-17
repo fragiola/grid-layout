@@ -54,4 +54,23 @@ Outside the root, parts and hooks reach the grid through a `gridLayoutRef`
   what each item renders.
 - A composable returns `{ state, props }` as computed refs: bind `props` with `v-bind`.
 
+## In Angular
+
+`@fragiola/grid-layout-angular` keeps the same contract, written the Angular way
+([Angular directives](/docs/api/angular)):
+
+- `render` is the element you write: each part is a directive on it (`gridLayoutRoot`,
+  `[gridLayoutItem]="item.id"`, `gridLayoutDragHandle`, `[gridLayoutDragSource]="{ w, h }"`),
+  which keeps your attributes, classes, styles and listeners; the structural style keys win.
+- `className` and `style` as a function of the state are your own bindings, reading the part's
+  `state()` signal through `exportAs` (`#part="gridLayoutItem"`,
+  `[class.held]="part.state().dragging"`), or a `data-*` selector.
+- The recursion, and the parts present only at times, are template directives:
+  `<ng-template gridLayoutItems let-item>`, `*gridLayoutCells="let cell"`,
+  `*gridLayoutPlaceholder`, `*gridLayoutResizeHandle="'bottom-end'"`, `*gridLayoutDragPreview`.
+- Callbacks are outputs (`(layoutChange)`, `(dragStart)`, `(dropped)`, …); `[(layout)]` binds the
+  layout both ways, once per committed change.
+- Hooks are injection functions that return signals (`injectGridLayout()`, `injectItems()`, …);
+  a part's function (`injectItem()`) gives the enclosing directive's `{ state }`.
+
 <Example id="unstyled" />

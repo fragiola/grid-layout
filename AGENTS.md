@@ -20,9 +20,10 @@ core's root binding (`createGridLayoutRootBinding`), which every adapter calls.
 | `packages/core` | `@fragiola/grid-layout` | the layout rules (geometry, collision, move, compaction), the typed model and its commands, the engine that binds one grid to the DOM | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/grid-layout-react` | the `GridLayout.*` primitives and hooks over the core | peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/grid-layout-vue` | the same `GridLayout.*` primitives as Vue components, and the hooks as composables, over the core | peer `vue` (^3.5) |
+| `packages/angular` | `@fragiola/grid-layout-angular` | the same primitives as Angular attribute and template directives (`[gridLayoutRoot]`, …), and the hooks as injection functions, over the core; built with ng-packagr | peer `@angular/core` (^22) |
 | `apps/playground` | private | the dev app (every site example live, with themes and source), unstyled fixture pages driven by Playwright | both packages, `examples/react`, `examples/shared` |
 | `examples/shared` | private | what every framework's examples share and no reader copies: each example's metadata, the themes, the embed protocol, the manifest builder and loader generator, every Playwright spec; imports no framework | |
-| `examples/react`, `examples/vue`, `site` | private | each framework's examples (one embed app per framework, same ids) and the pages, exported for fragiola.com | `examples/shared` |
+| `examples/react`, `examples/vue`, `examples/angular`, `site` | private | each framework's examples (one embed app per framework, same ids) and the pages, exported for fragiola.com | `examples/shared` |
 
 ## Non-negotiable rules
 
@@ -238,9 +239,9 @@ an implementation detail.
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `vue` (jsdom), `playground`, `examples-shared`, `examples-react`, `examples-vue`, `site` |
+| `pnpm test` | Vitest: `core` (node), `react` (jsdom), `vue` (jsdom), `angular` (jsdom, `@analogjs/vitest-angular`), `playground`, `examples-shared`, `examples-react`, `examples-vue`, `examples-angular`, `site` |
 | `pnpm bench` | Vitest benchmarks (informative, not a gate) |
-| `pnpm build` | `pnpm -r build` (tsdown for the packages, Vite for the apps), then the `.d.ts` check |
+| `pnpm build` | `pnpm -r build` (tsdown for the packages, ng-packagr for Angular's, Vite for the apps), then the `.d.ts` check |
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and each framework's examples app (`examples/<framework>`: the shared specs of `examples/shared/e2e` against its own embed, Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
 | `pnpm dev` | the playground on <http://localhost:5173>: every example live, the fixtures (`PLAYGROUND_PORT` moves it) |
@@ -253,6 +254,7 @@ an implementation detail.
 packages/core/      @fragiola/grid-layout        src/<domain>/ (compactors, engine, layout, model), tests/ mirroring it
 packages/react/     @fragiola/grid-layout-react  src/components/, hooks/, utils/, compactors/; entries index.ts, parts.ts, context.ts
 packages/vue/       @fragiola/grid-layout-vue    src/components/, composables/, utils/, compactors/; entries index.ts, parts.ts, context.ts
+packages/angular/   @fragiola/grid-layout-angular src/lib/{directives,inject,utils}/ (`.directive.ts`), src/compactors/; entry public-api.ts
 apps/playground/    src/shell/                   the shell: catalog, sidebar, toolbar, stage, source
                     src/fixture/                 what the fixture pages mount
                     fixtures/<name>/             unstyled pages Playwright drives
@@ -263,7 +265,9 @@ examples/shared/    src/meta/<slug>.ts           every example's metadata, whate
                     e2e/                         the Playwright specs every framework runs, also inside an iframe
 examples/react/     src/examples/<slug>/         the site's React examples (the embed app, Vite)
                     src/components, lib, …       Fragiola UI, vendored (scripts/vendor-fragiola.ts)
-examples/vue/       src/examples/<slug>/         the Vue examples (index.vue + styles.ts), same ids (a subset until Epic #38)
+examples/vue/       src/examples/<slug>/         the Vue examples (index.vue + styles.ts), same ids
+                    src/lib, styles              copies of the React app's vendored files (tests/vendored.test.ts)
+examples/angular/   src/examples/<slug>/         the Angular examples (index.ts + styles.ts), same ids (a subset until Epic #44)
                     src/lib, styles              copies of the React app's vendored files (tests/vendored.test.ts)
 site/               docs/                        the pages fragiola.com/grid-layout serves
                     export.ts, contract.ts       `pnpm site:export` and its validation
@@ -437,8 +441,55 @@ Vue adapter. What differs is only how Vue writes it:
 - The Vue examples (`examples/vue`) are single-file components (`index.vue`) with their classes in
   `styles.ts`, bound with `:class` (no class string in a template, `tests/examples.test.ts`);
   `vue-tsc` checks them with TypeScript 6.0, pinned in that app only (it does not run on 7 yet).
-- The docs show both frameworks with `<Framework name="react">` / `<Framework name="vue">`
+- The docs show each framework with `<Framework name="react">` / `<Framework name="vue">`
   blocks; `site/docs/api/vue.mdx` maps every React prop and hook to Vue.
+
+### In Angular (`@fragiola/grid-layout-angular`)
+
+The same parts, `data-*` and behaviour, as standalone Angular 22 directives on the app's own
+elements (`packages/angular/src/lib/directives`, `*.directive.ts`) and injection functions
+(`src/lib/inject`), after Dockable's Angular adapter: zoneless, signals, ng-packagr (partial
+compilation), TypeScript 6.0 pinned in that package (`ngc` does not run on 7). What differs is
+only how Angular writes it:
+
+- `render` is the directive itself: `[gridLayoutRoot]`, `[gridLayoutItem]="item.id"`,
+  `gridLayoutDragHandle`, `[gridLayoutDragSource]="{ w, h }"` go on any element, which keeps its
+  own attributes, classes and styles (structural keys win). `GRID_LAYOUT` lists every directive
+  for a component's `imports`.
+- The recursion and the parts present only at times are template directives on the app's
+  element: `<ng-template gridLayoutItems let-item>`, `*gridLayoutCells="let cell; rows: 4"`,
+  `*gridLayoutPlaceholder="let state"`, `*gridLayoutResizeHandle="'bottom-end'"` (rendered only
+  while its item can be resized), `*gridLayoutDragPreview="gridLayoutRef; let state"`; the part is
+  written onto the template's first element.
+- `className`/`style` as a function of the state are the app's bindings on its element, reading
+  the part's `state()` through `exportAs` (`#item="gridLayoutItem"`, `[class.held]="item.state().dragging"`).
+- Inputs are React's props; callbacks are outputs: `[(layout)]`/`[(layouts)]` pair `layout` and
+  `layouts` with `(layoutChange)`/`(layoutsChange)`, once per committed change (D9), emitted as
+  copies the app owns; `(breakpointChange)` gives `{ breakpoint, cols }`; `(dragStart)`,
+  `(dragMove)`, `(dragStop)`, `(resizeStart)`, `(resizeMove)`, `(resizeStop)`; `(dropped)` is
+  `onDrop` (on the root and on a source); `[externalDrag]` is `onExternalDrag`. `onDrag`, `onResize`
+  and `onDrop` are renamed: `drag`, `resize` and `drop` are native events of the element.
+- Hooks are injection functions returning signals: `injectGridLayout()` (`Signal<{ model, engine }>`,
+  read after the root has its inputs), `injectGridLayoutView`, `injectItems`, `injectGesture`,
+  `injectBreakpoint`, `injectGridLayoutEvents`, `injectCells`, `injectPlaceholder`,
+  `injectDragPreview` (the core's `Part`s); `injectItem`, `injectDragHandle`, `injectResizeHandle`,
+  `injectDragSource` give the enclosing part's `{ state }`. A ref is the core's
+  `createGridLayoutRef()`.
+- The root makes the grid from its first inputs (`ngOnInit`) and runs the core binding's steps in
+  an `afterRenderEffect`; the engine attaches after the first render, once the element is in the
+  document. The engine's listeners are added after the template's, so the app's handler runs first
+  (`preventDefault` vetoes).
+- A part's attributes and style are compared with what the directive wrote last, never with the
+  element: during a gesture Angular writes nothing the engine owns (D8, a test watches the DOM).
+- `tests/exports.test.ts` fails when a React primitive or hook has no Angular counterpart.
+- The Angular examples (`examples/angular`, `examples-angular`) are standalone components
+  (`index.ts`, default-exported, templates inline) with their classes in `styles.ts`, bound with
+  `[class]` (no class string in a template, `tests/examples.test.ts`); Vite with
+  `@analogjs/vite-plugin-angular` (`tsconfig.app.json`), zoneless, TypeScript 6.0 pinned in that
+  app; `ngc` typechecks them. They are a subset (`hello-grid`, `unstyled`) until Epic #44: the
+  shared specs skip the rest (Angular is not in `COMPLETE_FRAMEWORKS`).
+- The docs add `<Framework name="angular">` blocks; `site/docs/api/angular.mdx` maps every React
+  prop and hook to Angular.
 
 ## Site
 
@@ -446,7 +497,7 @@ The docs and examples are served by `fragiola.com/grid-layout`, built by the `ww
 repo's **site export** (`../www/CONTRACT.md`, v1.2). This repo only provides: the pages
 (`site/docs`, base-free links, the v1.2 vocabulary), the gallery configuration (`examples.json`)
 and one examples app per framework of `site/project.json` (`examples/<framework>`, built for
-`<base>/embed/<framework>/`; React and Vue today), sharing `examples/shared`. A framework may ship a
+`<base>/embed/<framework>/`; React, Vue and Angular today), sharing `examples/shared`. A framework may ship a
 subset of the examples while it is written: the shared specs skip what it lacks, except for the
 frameworks of `COMPLETE_FRAMEWORKS` (`examples/shared/e2e/available.ts`). `www` owns the shell,
 the gallery chrome, the code panel and search. A page's `title` is at most 60 characters and

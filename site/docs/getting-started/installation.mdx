@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the package for your framework, React or Vue, check the peer dependencies, and see why there is no stylesheet to import.
+description: Install the package for your framework, React, Vue or Angular, check the peer dependencies, and see why there is no stylesheet to import.
 ---
 
 <Framework name="react">
@@ -53,6 +53,31 @@ the whole framework-free core, re-exported.
 
 </Framework>
 
+<Framework name="angular">
+
+An Angular app installs one package, `@fragiola/grid-layout-angular`: the directives, the
+injection functions and the whole framework-free core, re-exported.
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/grid-layout-angular
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/grid-layout-angular
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/grid-layout-angular
+        ```
+    </Tab>
+</Tabs>
+
+</Framework>
+
 The core, `@fragiola/grid-layout`, comes along: import its types and helpers from your
 framework's package, which re-exports it.
 
@@ -62,6 +87,7 @@ framework's package, which re-exports it.
 | --- | --- |
 | `react` and `react-dom` **^19** (React) | peer dependencies of `@fragiola/grid-layout-react`: the primitives use `ref` as a plain prop and ref cleanup functions |
 | `vue` **^3.5** (Vue) | the peer dependency of `@fragiola/grid-layout-vue` |
+| `@angular/core` **^22** (Angular) | the peer dependency of `@fragiola/grid-layout-angular`: standalone directives and signals, no zone.js needed |
 | A browser DOM | the engine measures the root and its items; the model loads in plain Node (tests, a server) |
 
 The packages have no other runtime dependency, and the core has none at all: no drag library, no
@@ -99,6 +125,25 @@ import {
 
 The components are the React package's primitives, written the Vue way (props, events, slots):
 [Vue components](/docs/api/vue) maps each React prop.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import {
+    // every directive, for a standalone component's `imports`, and the injection functions
+    GRID_LAYOUT,
+    injectGridLayout,
+    // the core: its types and helpers
+    type Layout,
+    verticalCompactor,
+} from "@fragiola/grid-layout-angular";
+```
+
+The directives are the React package's primitives, written the Angular way (directives on your
+elements, inputs, outputs, templates): [Angular directives](/docs/api/angular) maps each React
+prop.
 
 </Framework>
 

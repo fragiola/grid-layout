@@ -1,10 +1,10 @@
 // From Data Grid (fragiola/data-grid, scripts/size-report.ts), same author and licence.
 //
-// Reports the packages' bundle sizes (Data Grid Epic #62): every `packages/*/dist/*.js`, raw, gzip and,
-// when the build's own minifier is reachable (rolldown, under tsdown), minified + gzip; and the
-// chunks each file imports, so an entry point that pulls a shared chunk shows it. A report, never a
-// gate: it prints a markdown table (to `$GITHUB_STEP_SUMMARY` too, in CI) and always exits 0. Run
-// after `pnpm build`.
+// Reports the packages' bundle sizes (Data Grid Epic #62): every `packages/*/dist/*.js` (an Angular
+// package's `dist/fesm2022/*.mjs`), raw, gzip and, when the build's own minifier is reachable
+// (rolldown, under tsdown), minified + gzip; and the chunks each file imports, so an entry point
+// that pulls a shared chunk shows it. A report, never a gate: it prints a markdown table (to
+// `$GITHUB_STEP_SUMMARY` too, in CI) and always exits 0. Run after `pnpm build`.
 import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -32,6 +32,20 @@ async function loadMinify(): Promise<Minify | undefined> {
     }
 }
 
+/**
+ * A package's built files: `dist/*.js` (tsdown), or `dist/fesm2022/*.mjs` (ng-packagr, the Angular
+ * Package Format), relative to `dist`.
+ */
+function entryFiles(dist: string): string[] {
+    const fesm = join(dist, "fesm2022");
+    const files = existsSync(fesm)
+        ? readdirSync(fesm)
+              .filter((file) => file.endsWith(".mjs"))
+              .map((file) => `fesm2022/${file}`)
+        : readdirSync(dist).filter((file) => file.endsWith(".js"));
+    return files.sort();
+}
+
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 /** The chunks a built file imports (`./name.js`), by file name. */
@@ -53,9 +67,7 @@ async function main() {
             lines.push(`| packages/${pkg} | not built | | | |`);
             continue;
         }
-        for (const name of readdirSync(dist)
-            .filter((file) => file.endsWith(".js"))
-            .sort()) {
+        for (const name of entryFiles(dist)) {
             const source = readFileSync(join(dist, name), "utf8");
             let minified: string | undefined;
             try {
