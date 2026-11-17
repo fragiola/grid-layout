@@ -1,4 +1,3 @@
-import { NgClass } from "@angular/common";
 import { Component, signal } from "@angular/core";
 import {
     createGridLayoutRef,
@@ -23,13 +22,11 @@ const titleOf = (id: string) =>
 // `createId`. What a note says is the app's: the layout holds only ids and boxes.
 @Component({
     selector: "example-drag-from-outside",
-    imports: [GRID_LAYOUT, NgClass, LucideStickyNote],
+    imports: [GRID_LAYOUT, LucideStickyNote],
     host: { class: "contents" },
     template: `
         <div [class]="styles.frame">
             <aside [class]="styles.sidebar" aria-label="New items">
-                <!-- [ngClass], not [class]: Angular runs an element's [class] before its inputs,
-                     and a source's state needs its gridLayoutRef input -->
                 <div
                     [gridLayoutDragSource]="{ w: 3, h: 2, minW: 2, minH: 2 }"
                     #source="gridLayoutDragSource"
@@ -37,7 +34,7 @@ const titleOf = (id: string) =>
                     data="note"
                     aria-label="New note"
                     aria-roledescription="draggable"
-                    [ngClass]="styles.source(source.state())"
+                    [class]="styles.source(source.state())"
                 >
                     <svg lucideStickyNote [class]="styles.icon"></svg>
                     New note

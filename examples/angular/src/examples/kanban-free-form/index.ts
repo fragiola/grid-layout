@@ -1,9 +1,7 @@
 import { Component, signal } from "@angular/core";
 import {
     createGridLayoutRef,
-    type DragSourceState,
     GRID_LAYOUT,
-    type GridLayoutDragSource,
     injectGridLayoutEvents,
     type Layout,
     noCompactor,
@@ -43,13 +41,6 @@ const FIRST: Record<string, Note> = {
     "note-5": { text: "Ship the onboarding emails" },
 };
 
-/** A source's state before its inputs are set: nothing brought, nothing held. */
-const IDLE_SOURCE: DragSourceState = {
-    dragging: false,
-    grabbed: false,
-    disabled: false,
-};
-
 // A free-form board: nothing settles (`noCompactor`), so a note stays where it is dropped, and
 // `preventCollision` refuses a move onto another note instead of pushing it away. The lanes are
 // the grid's cells, drawn behind (`*gridLayoutCells`), under static headers. A new note comes from
@@ -68,7 +59,7 @@ const IDLE_SOURCE: DragSourceState = {
                     data="note"
                     aria-label="New note"
                     aria-roledescription="draggable"
-                    [class]="styles.source(sourceState(source))"
+                    [class]="styles.source(source.state())"
                 >
                     <svg lucideStickyNote [class]="styles.icon"></svg>
                     New note
@@ -146,13 +137,5 @@ export default class KanbanFreeForm {
 
     protected change(id: string, note: Note) {
         this.notes.update((current) => ({ ...current, [id]: note }));
-    }
-
-    /**
-     * Workaround: Angular binds an element's `[class]` before its inputs, and a source outside
-     * the root reads its state through its `gridLayoutRef`, which is not set on the first pass.
-     */
-    protected sourceState(source: GridLayoutDragSource): DragSourceState {
-        return source.gridLayoutRef() ? source.state() : IDLE_SOURCE;
     }
 }

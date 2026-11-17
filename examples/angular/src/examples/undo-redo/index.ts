@@ -1,10 +1,7 @@
-import { Component, computed, inject, signal, viewChild } from "@angular/core";
+import { Component, inject, signal } from "@angular/core";
 import {
     createGridLayoutRef,
-    type DragSourceState,
     GRID_LAYOUT,
-    GridLayoutDragSource,
-    injectGridLayout,
     type Layout,
 } from "@fragiola/grid-layout-angular";
 import { LucideStickyNote } from "@lucide/angular";
@@ -46,8 +43,9 @@ const LAYOUTS: Record<string, Layout> = {
                     <div
                         [gridLayoutDragSource]="{ w: 3, h: 2 }"
                         [gridLayoutRef]="gridLayoutRef"
+                        #source="gridLayoutDragSource"
                         aria-label="New note"
-                        [class]="styles.source(sourceState())"
+                        [class]="styles.source(source.state())"
                     >
                         <svg lucideStickyNote [class]="styles.icon"></svg>
                         New note
@@ -109,20 +107,6 @@ export default class UndoRedo {
     protected readonly layouts = LAYOUTS;
     protected readonly gridLayoutRef = inject(GRID);
     protected readonly narrow = signal(false);
-    private readonly grid = injectGridLayout(this.gridLayoutRef);
-    private readonly source = viewChild.required(GridLayoutDragSource);
-    /**
-     * The source's state, once the grid holds the ref. Angular applies `[class]` before an
-     * element's inputs, so `#source="gridLayoutDragSource"` read there on the first render asks
-     * for the grid before `[gridLayoutRef]` is set, and throws; until the root mounts, the source
-     * is idle anyway.
-     */
-    protected readonly sourceState = computed(
-        (): DragSourceState =>
-            this.grid()
-                ? this.source().state()
-                : { dragging: false, grabbed: false, disabled: false },
-    );
     private made = 0;
     protected readonly createId = () => {
         this.made += 1;

@@ -1,4 +1,3 @@
-import { NgClass } from "@angular/common";
 import { Component, computed } from "@angular/core";
 import {
     createGridLayoutRef,
@@ -23,7 +22,7 @@ const SHEET = WIDGETS.slice(3, 9);
 // grid shows is the app's content for that id, and a widget on the grid is not offered again.
 @Component({
     selector: "example-widget-sheet",
-    imports: [GRID_LAYOUT, NgClass],
+    imports: [GRID_LAYOUT],
     host: { class: "contents" },
     template: `
         <div [class]="styles.frame">
@@ -58,8 +57,6 @@ const SHEET = WIDGETS.slice(3, 9);
                 <section aria-label="Widgets to add" [class]="styles.sheet">
                     <p [class]="styles.handle" aria-hidden="true"></p>
                     <div [class]="styles.shelf">
-                        <!-- [ngClass], not [class]: Angular runs an element's [class] before its inputs,
-                             and a source's state needs its gridLayoutRef input -->
                         @for (entry of left(); track entry.id) {
                             <div
                                 [gridLayoutDragSource]="{ w: 1, h: 1 }"
@@ -67,7 +64,7 @@ const SHEET = WIDGETS.slice(3, 9);
                                 [gridLayoutRef]="gridLayoutRef"
                                 [itemId]="entry.id"
                                 [attr.aria-label]="'Add ' + entry.title"
-                                [ngClass]="styles.source(source.state())"
+                                [class]="styles.source(source.state())"
                             >
                                 <span [class]="styles.title">{{ entry.title }}</span>
                                 <span [class]="styles.sourceValue">{{ entry.value }}</span>

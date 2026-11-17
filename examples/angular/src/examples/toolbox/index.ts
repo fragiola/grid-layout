@@ -1,4 +1,3 @@
-import { NgClass } from "@angular/common";
 import { Component, type ElementRef, signal, viewChild } from "@angular/core";
 import {
     createGridLayoutRef,
@@ -24,7 +23,7 @@ const layout = dashboard();
 // widget puts it away; Tab to it in the toolbox and press Enter to bring it back.
 @Component({
     selector: "example-toolbox",
-    imports: [GRID_LAYOUT, NgClass, ClickableButton, LucideArchive],
+    imports: [GRID_LAYOUT, ClickableButton, LucideArchive],
     host: { class: "contents" },
     template: `
         <div [class]="styles.frame">
@@ -36,8 +35,6 @@ const layout = dashboard();
                 [class]="styles.toolbox"
             >
                 <p [class]="styles.heading">Toolbox</p>
-                <!-- [ngClass], not [class]: Angular runs an element's [class] before its inputs,
-                     and a source's state needs its gridLayoutRef input -->
                 @for (entry of stowed(); track entry.id) {
                     <div
                         [gridLayoutDragSource]="{ w: entry.w, h: entry.h }"
@@ -45,7 +42,7 @@ const layout = dashboard();
                         [gridLayoutRef]="gridLayoutRef"
                         [itemId]="entry.id"
                         [attr.aria-label]="widget(entry.id).title + ', in the toolbox'"
-                        [ngClass]="styles.source(source.state())"
+                        [class]="styles.source(source.state())"
                     >
                         {{ widget(entry.id).title }}
                     </div>

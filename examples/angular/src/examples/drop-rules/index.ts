@@ -1,4 +1,3 @@
-import { NgClass } from "@angular/common";
 import { Component, computed, effect, signal } from "@angular/core";
 import {
     createGridLayoutRef,
@@ -27,13 +26,11 @@ const START: Layout = [{ id: "kpi-0", x: 0, y: 0, w: 3, h: 2 }];
 // apart; the reason a rule gives is the app's to show.
 @Component({
     selector: "example-drop-rules",
-    imports: [GRID_LAYOUT, NgClass],
+    imports: [GRID_LAYOUT],
     host: { class: "contents" },
     template: `
         <div [class]="styles.frame">
             <aside [class]="styles.sidebar" aria-label="Widgets">
-                <!-- [ngClass], not [class]: Angular runs an element's [class] before its inputs,
-                     and a source's state needs its gridLayoutRef input -->
                 @for (source of sources; track source.kind) {
                     <div
                         [gridLayoutDragSource]="{ w: source.w, h: source.h, minW: 3 }"
@@ -41,7 +38,7 @@ const START: Layout = [{ id: "kpi-0", x: 0, y: 0, w: 3, h: 2 }];
                         [gridLayoutRef]="gridLayoutRef"
                         [itemId]="source.kind + '-' + made()"
                         [attr.aria-label]="source.title + ', ' + source.rule"
-                        [ngClass]="styles.source(part.state())"
+                        [class]="styles.source(part.state())"
                     >
                         <span [class]="styles.sourceTitle">{{ source.title }}</span>
                         <span [class]="styles.sourceText">{{ source.rule }}</span>

@@ -1,4 +1,3 @@
-import { NgClass } from "@angular/common";
 import { Component, signal } from "@angular/core";
 import {
     createGridLayoutRef,
@@ -27,14 +26,12 @@ let next = 0;
 // brings the widget in at the first free cell, the arrows place it, Enter adds it.
 @Component({
     selector: "example-widget-sidebar",
-    imports: [GRID_LAYOUT, NgClass, ClickableButton, LucideX, WidgetBody],
+    imports: [GRID_LAYOUT, ClickableButton, LucideX, WidgetBody],
     host: { class: "contents" },
     template: `
         <div [class]="styles.frame">
             <aside [class]="styles.sidebar" aria-label="Widgets">
                 <p [class]="styles.heading">Widgets</p>
-                <!-- [ngClass], not [class]: Angular runs an element's [class] before its inputs,
-                     and a source's state needs its gridLayoutRef input -->
                 @for (entry of catalogue; track entry.kind) {
                     <div
                         [gridLayoutDragSource]="entry.size"
@@ -43,7 +40,7 @@ let next = 0;
                         [data]="entry.kind"
                         [attr.aria-label]="entry.title + ' widget, ' + entry.size.w + ' by ' + entry.size.h"
                         [attr.aria-describedby]="keys"
-                        [ngClass]="styles.source(source.state())"
+                        [class]="styles.source(source.state())"
                     >
                         <span [class]="styles.sourceTitle">{{ entry.title }}</span>
                         <span [class]="styles.sourceText">{{ entry.description }}</span>

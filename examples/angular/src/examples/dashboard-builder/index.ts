@@ -7,10 +7,8 @@ import {
 } from "@angular/core";
 import {
     createGridLayoutRef,
-    type DragSourceState,
     type GestureEvent,
     GRID_LAYOUT,
-    type GridLayoutDragSource,
     injectGridLayoutEvents,
     injectGridLayoutView,
     type Layout,
@@ -38,13 +36,6 @@ const STARTER: Layout = [
     { id: "chart-1", x: 3, y: 0, w: 6, h: 3 },
     { id: "notes-1", x: 9, y: 0, w: 3, h: 3 },
 ];
-
-/** A source's state before its inputs are set: nothing brought, nothing held. */
-const IDLE_SOURCE: DragSourceState = {
-    dragging: false,
-    grabbed: false,
-    disabled: false,
-};
 
 /** An item's name: its kind and its number, from its id (`chart-3` is "Chart 3"). */
 function nameOf(id: string): string {
@@ -79,7 +70,7 @@ function saved(): Layout | undefined {
                         [itemId]="freeId(layout(), entry.kind)"
                         [data]="entry.kind"
                         [attr.aria-label]="entry.title + ' widget'"
-                        [class]="styles.source(sourceState(source))"
+                        [class]="styles.source(source.state())"
                     >
                         <span [class]="styles.sourceTitle">{{ entry.title }}</span>
                         <span [class]="styles.sourceText">{{ entry.description }}</span>
@@ -191,14 +182,6 @@ export default class DashboardBuilder {
             const said = describeGesture(event, name);
             if (said) this.message.set(said);
         }, this.gridLayoutRef);
-    }
-
-    /**
-     * Workaround: Angular binds an element's `[class]` before its inputs, and a source outside
-     * the root reads its state through its `gridLayoutRef`, which is not set on the first pass.
-     */
-    protected sourceState(source: GridLayoutDragSource): DragSourceState {
-        return source.gridLayoutRef() ? source.state() : IDLE_SOURCE;
     }
 
     protected remove(id: string) {
