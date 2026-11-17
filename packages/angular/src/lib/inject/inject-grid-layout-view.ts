@@ -18,7 +18,6 @@ export function injectGridLayoutView(
     const [gridLayoutRef] = args;
     return viewOf(
         gridOf(
-            "injectGridLayoutView",
             () => gridLayoutRef,
             injectRootOrRef("injectGridLayoutView", gridLayoutRef),
         ),

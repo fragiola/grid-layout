@@ -87,6 +87,58 @@ class Styled {
     readonly layout = layout;
 }
 
+/**
+ * The parts' state read by a `[class]` on their own elements, which Angular applies before it
+ * sets their inputs: a drag source outside the root (through its ref) and a drag handle outside
+ * its item. And the app's own tab stops on the parts' elements, static or bound.
+ */
+@Component({
+    selector: "test-bound",
+    imports: [GRID_LAYOUT],
+    template: `
+        <div
+            [gridLayoutDragSource]="{ w: 1, h: 1 }"
+            [gridLayoutRef]="gridLayoutRef"
+            #source="gridLayoutDragSource"
+            [class]="source.state().dragging ? 'lifted' : 'resting'"
+            tabindex="-1"
+            data-testid="source"
+        ></div>
+        <div gridLayoutRoot [width]="1200" [rowHeight]="50" [defaultLayout]="layout" [gridLayoutRef]="gridLayoutRef">
+            <ng-template gridLayoutItems let-item>
+                <div
+                    [gridLayoutItem]="item.id"
+                    #part="gridLayoutItem"
+                    [class]="part.state().static ? 'pinned' : 'free'"
+                    [attr.tabindex]="-1"
+                    [attr.data-testid]="item.id"
+                ></div>
+            </ng-template>
+            <span
+                [gridLayoutDragHandle]="'a'"
+                #handle="gridLayoutDragHandle"
+                [class]="handle.state().dragging ? 'pulled' : 'idle'"
+                tabindex="-1"
+                data-testid="grip"
+            ></span>
+        </div>
+    `,
+})
+class Bound {
+    readonly gridLayoutRef = createGridLayoutRef();
+    readonly layout = layout;
+}
+
+/** Items the app takes out of the tab order with a static `tabindex`, as a read-only board. */
+@Component({
+    selector: "test-read-only",
+    imports: [GRID_LAYOUT],
+    template: `<div gridLayoutRoot [width]="1200" [rowHeight]="50" [defaultLayout]="layout"><ng-template gridLayoutItems let-item><div [gridLayoutItem]="item.id" tabindex="-1" [attr.data-testid]="item.id"></div></ng-template></div>`,
+})
+class ReadOnly {
+    readonly layout = layout;
+}
+
 /** What a component inside a part reads of it. */
 let read: Record<string, unknown> = {};
 
@@ -219,6 +271,51 @@ describe("the primitives", () => {
         expect(pinned.className).toBe("pinned");
         expect(pinned.dataset.gridLayoutPart).toBe("item");
         expect(pinned.hasAttribute("data-static")).toBe(true);
+    });
+
+    it("let a [class] on their own element read their state before their inputs are set", async () => {
+        stubBrowser();
+        await render(Bound);
+        const source = document.querySelector(
+            '[data-testid="source"]',
+        ) as HTMLElement;
+        expect(source.className).toBe("resting");
+        expect(source.dataset.gridLayoutPart).toBe("drag-source");
+        const grip = document.querySelector(
+            '[data-testid="grip"]',
+        ) as HTMLElement;
+        expect(grip.className).toBe("idle");
+        expect(grip.dataset.gridLayoutPart).toBe("drag-handle");
+        expect(
+            (document.querySelector('[data-testid="s"]') as HTMLElement)
+                .className,
+        ).toBe("pinned");
+        const press = await pointer(source, 1300, 500);
+        await press.move(...cell(6, 0));
+        expect(source.className).toBe("lifted");
+        await press.release(...cell(6, 0));
+        expect(source.className).toBe("resting");
+    });
+
+    it("keep the app's own tabindex over the part's, static or bound", async () => {
+        stubBrowser();
+        await render(Bound);
+        for (const id of ["source", "a", "s", "grip"]) {
+            const element = document.querySelector(
+                `[data-testid="${id}"]`,
+            ) as HTMLElement;
+            expect(element.getAttribute("tabindex"), id).toBe("-1");
+        }
+    });
+
+    it("keep a read-only board's items out of the tab order", async () => {
+        await render(ReadOnly);
+        for (const id of ["a", "s"]) {
+            const element = document.querySelector(
+                `[data-testid="${id}"]`,
+            ) as HTMLElement;
+            expect(element.getAttribute("tabindex"), id).toBe("-1");
+        }
     });
 
     it("hand their state to a component inside them", async () => {

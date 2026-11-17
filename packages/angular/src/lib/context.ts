@@ -51,23 +51,28 @@ export function injectItemContext(): GridLayoutItemContext | null {
 }
 
 /**
- * The item a handle works for: its own id (`given`), else the item it is inside of; neither is an
- * error once read.
+ * The item a handle works for: its own id (`given`), else the item it is inside of; `undefined`
+ * with neither (as before a handle outside an item has its inputs: a binding on its own element
+ * reads its state first). Neither is an error once the inputs are set ({@link requireHandleItemId}).
  */
 export function injectHandleItemId(
-    part: string,
     given: () => string | undefined,
-): () => string {
+): () => string | undefined {
     const inside = injectItemContext();
-    return () => {
-        const id = given() ?? inside?.itemId();
-        if (id === undefined) {
-            throw new Error(
-                `${part} must be used inside [gridLayoutItem], or name its item`,
-            );
-        }
-        return id;
-    };
+    return () => given() ?? inside?.itemId();
+}
+
+/** The handle's item, or a clear error, named for `part`, without one. */
+export function requireHandleItemId(
+    part: string,
+    itemId: string | undefined,
+): string {
+    if (itemId === undefined) {
+        throw new Error(
+            `${part} must be used inside [gridLayoutItem], or name its item`,
+        );
+    }
+    return itemId;
 }
 
 /**

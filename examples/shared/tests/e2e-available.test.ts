@@ -7,6 +7,7 @@ import {
     skipOrFail,
     skipReason,
 } from "../e2e/available.ts";
+import { FRAMEWORKS } from "../src/framework.ts";
 
 // The shared e2e suite runs against every framework's embed; a spec that opens an example the
 // framework does not have is skipped with this reason, unless the framework ships every example
@@ -42,8 +43,8 @@ describe("a spec's examples", () => {
 describe("a complete framework", () => {
     const available = ["hello-grid"];
 
-    it("is React and Vue today: Angular ships a subset while it is written", () => {
-        expect(COMPLETE_FRAMEWORKS).toEqual(["react", "vue"]);
+    it("is every framework today: each one ships every example", () => {
+        expect([...COMPLETE_FRAMEWORKS].sort()).toEqual([...FRAMEWORKS].sort());
     });
 
     it("fails a spec whose example it lacks, instead of skipping it", () => {
@@ -51,11 +52,5 @@ describe("a complete framework", () => {
             /react has no drop-files example, but every react example is required/,
         );
         expect(skipOrFail("react", available, ["hello-grid"])).toBeUndefined();
-    });
-
-    it("skips for a framework that is not complete yet", () => {
-        expect(skipOrFail("angular", available, ["drop-files"])).toBe(
-            "angular has no drop-files example",
-        );
     });
 });

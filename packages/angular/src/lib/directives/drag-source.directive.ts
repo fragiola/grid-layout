@@ -28,7 +28,7 @@ import {
     injectHost,
     listenAfter,
 } from "../utils/helpers";
-import { fromStore, gridOf } from "../utils/signals";
+import { fromStore, gridOf, requireRootOrRef } from "../utils/signals";
 
 /**
  * A drag source, on the app's element anywhere on the page: `<div [gridLayoutDragSource]="{ w:
@@ -59,11 +59,8 @@ export class GridLayoutDragSource implements OnInit {
 
     private readonly host = injectHost();
     private readonly destroyRef = inject(DestroyRef);
-    private readonly grid = gridOf(
-        "[gridLayoutDragSource]",
-        () => this.gridLayoutRef(),
-        injectOptionalGridLayoutContext(),
-    );
+    private readonly around = injectOptionalGridLayoutContext();
+    private readonly grid = gridOf(() => this.gridLayoutRef(), this.around);
     /** only this source's part of the view: a gesture elsewhere changes nothing here */
     private readonly status = fromStore(
         () => this.grid()?.engine.adapter.subscribe,
@@ -104,8 +101,12 @@ export class GridLayoutDragSource implements OnInit {
     }
 
     ngOnInit(): void {
-        // inside a root or with a ref: a clear error as early as React's
-        this.grid();
+        // inside a root or with a ref: a clear error as early as React's, once the inputs are set
+        requireRootOrRef(
+            "[gridLayoutDragSource]",
+            this.gridLayoutRef(),
+            this.around,
+        );
         const drop = (): ExternalDrop => ({
             item: this.gridLayoutDragSource(),
             itemId: this.itemId(),

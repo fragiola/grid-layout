@@ -21,7 +21,6 @@ export function injectGridLayout(
     }
     const [gridLayoutRef] = args;
     return gridOf(
-        "injectGridLayout",
         () => gridLayoutRef,
         injectRootOrRef("injectGridLayout", gridLayoutRef),
     );

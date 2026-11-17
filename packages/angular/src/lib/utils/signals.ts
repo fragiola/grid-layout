@@ -54,11 +54,12 @@ export function fromStore<S>(
 
 /**
  * The grid a part or an injection function works with: its `gridLayoutRef`'s, from anywhere
- * (`null` until a root holds it), else the root around it. Neither is an error, named for `part`,
- * once read.
+ * (`null` until a root holds it), else the root around it; `null` with neither. It never throws:
+ * a part's `state()` is read by bindings on its own element, which Angular applies before it sets
+ * the part's inputs, so on the first pass the ref is not there yet. A part with neither is an
+ * error once its inputs are set ({@link requireRootOrRef}, in its `ngOnInit`).
  */
 export function gridOf(
-    part: string,
     gridLayoutRef: () => GridLayoutRef | undefined,
     around: GridLayoutContext | null,
 ): Signal<GridLayoutHandle | null> {
@@ -68,13 +69,27 @@ export function gridOf(
     );
     return computed(() => {
         if (gridLayoutRef()) return held();
-        if (!around) {
-            throw new Error(
-                `${part} must be used inside [gridLayoutRoot], or take a gridLayoutRef`,
-            );
-        }
-        return around.handle();
+        return around ? around.handle() : null;
     });
+}
+
+/**
+ * A clear error, named for `part`, when it has neither a `gridLayoutRef` nor a root around it:
+ * called once its inputs are set (`ngOnInit`), as early as React's. Inside a root, it also reads
+ * the root's grid, which throws when the root has no inputs yet.
+ */
+export function requireRootOrRef(
+    part: string,
+    gridLayoutRef: GridLayoutRef | undefined,
+    around: GridLayoutContext | null,
+): void {
+    if (gridLayoutRef) return;
+    if (!around) {
+        throw new Error(
+            `${part} must be used inside [gridLayoutRoot], or take a gridLayoutRef`,
+        );
+    }
+    around.handle();
 }
 
 /** A grid's view, followed from anywhere; `undefined` without a grid. */

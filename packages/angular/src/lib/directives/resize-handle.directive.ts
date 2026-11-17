@@ -4,6 +4,7 @@ import {
     effect,
     inject,
     input,
+    type OnInit,
     type Signal,
     TemplateRef,
     untracked,
@@ -14,7 +15,11 @@ import {
     type ResizeSide,
     resizeHandlePart,
 } from "@fragiola/grid-layout";
-import { injectGridLayoutContext, injectHandleItemId } from "../context";
+import {
+    injectGridLayoutContext,
+    injectHandleItemId,
+    requireHandleItemId,
+} from "../context";
 import { beforeInputs, bindPart, optionalId } from "../utils/helpers";
 import { type PartContext, presentView, requireTemplate } from "../utils/views";
 
@@ -33,7 +38,7 @@ const UNSET_RESIZE_STATE: ResizeHandleState = {
  * `touch-action: none`. Where it sits and how it looks are the app's.
  */
 @Directive({ selector: "[gridLayoutResizeHandle]" })
-export class GridLayoutResizeHandle {
+export class GridLayoutResizeHandle implements OnInit {
     /** the side or corner it pulls */
     readonly gridLayoutResizeHandle = input.required<ResizeSide>();
     /** the item it resizes (default: the item it is inside of) */
@@ -44,21 +49,26 @@ export class GridLayoutResizeHandle {
     private readonly context = injectGridLayoutContext(
         "[gridLayoutResizeHandle]",
     );
-    private readonly itemId = injectHandleItemId(
-        "[gridLayoutResizeHandle]",
-        () => this.gridLayoutResizeHandleItemId(),
+    private readonly itemId = injectHandleItemId(() =>
+        this.gridLayoutResizeHandleItemId(),
     );
-    private readonly part = computed(() =>
-        resizeHandlePart(
-            this.context.view(),
-            this.itemId(),
-            this.gridLayoutResizeHandle(),
-        ),
-    );
+    private readonly part = computed(() => {
+        const itemId = this.itemId();
+        return itemId === undefined
+            ? undefined
+            : resizeHandlePart(
+                  this.context.view(),
+                  itemId,
+                  this.gridLayoutResizeHandle(),
+              );
+    });
 
     /** what the handle shows as `data-*`; `resizable` false: it renders nothing */
     readonly state: Signal<ResizeHandleState> = computed(() =>
-        beforeInputs(UNSET_RESIZE_STATE, () => this.part().state),
+        beforeInputs(
+            UNSET_RESIZE_STATE,
+            () => this.part()?.state ?? UNSET_RESIZE_STATE,
+        ),
     );
 
     constructor() {
@@ -74,8 +84,8 @@ export class GridLayoutResizeHandle {
             inject(ViewContainerRef),
             template,
             () => {
-                const state = this.part().state;
-                return state.resizable
+                const state = this.part()?.state;
+                return state?.resizable
                     ? { $implicit: state, state }
                     : undefined;
             },
@@ -86,6 +96,7 @@ export class GridLayoutResizeHandle {
             const target = element();
             if (!target) return;
             const itemId = this.itemId();
+            if (itemId === undefined) return;
             const side = this.gridLayoutResizeHandle();
             const { engine } = this.context.handle();
             untracked(() =>
@@ -94,6 +105,11 @@ export class GridLayoutResizeHandle {
                 ),
             );
         });
+    }
+
+    ngOnInit(): void {
+        // as early as React's: with its first inputs, not at the first render
+        requireHandleItemId("[gridLayoutResizeHandle]", this.itemId());
     }
 
     static ngTemplateContextGuard(

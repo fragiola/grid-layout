@@ -17,6 +17,14 @@ export async function boxOf(locator: Locator) {
 
 /** Waits until no animation runs on the page: items glide into place after a change. */
 export async function settled(page: Page) {
+    // two frames first: a framework that renders after the event (Angular's zoneless change
+    // detection) has then applied the classes whose transition is to be waited for
+    await page.evaluate(
+        () =>
+            new Promise((done) =>
+                requestAnimationFrame(() => requestAnimationFrame(done)),
+            ),
+    );
     await page.waitForFunction(() =>
         document
             .getAnimations()
