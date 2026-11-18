@@ -1,6 +1,6 @@
 {
     "name": "@fragiola/grid-layout",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "description": "Headless grid layout core: layout rules (collision, move, compaction), a typed model with commands, and the engine that binds a draggable, resizable grid to the DOM.",
     "keywords": [
         "grid",
