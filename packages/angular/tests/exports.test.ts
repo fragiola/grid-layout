@@ -77,7 +77,6 @@ describe("@fragiola/grid-layout-angular", () => {
         for (const [name, value] of Object.entries(core)) {
             expect(exported[name], name).toBe(value);
         }
-        expect(angular.VERSION).toBe("0.0.0");
     });
 
     it("has a directive for every React primitive (GridLayout.X → GridLayoutX), each in GRID_LAYOUT", () => {

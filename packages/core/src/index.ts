@@ -185,6 +185,3 @@ export {
     type RunArgs,
     type RunOptions,
 } from "./model/types";
-
-/** The package version, until the first release replaces this placeholder export. */
-export const VERSION = "0.0.0";
