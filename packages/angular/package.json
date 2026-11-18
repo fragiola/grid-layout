@@ -1,6 +1,6 @@
 {
     "name": "@fragiola/grid-layout-angular",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "description": "Composable, unstyled Angular directives for @fragiola/grid-layout: draggable, resizable grid layouts styled entirely by you.",
     "keywords": [
         "angular",
