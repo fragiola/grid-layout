@@ -1,6 +1,15 @@
 # CI: the Fragiola project jobs, with the Playwright suites split out of Checks.
 #
 #   Checks   Biome, TypeScript, the unit tests and the build (with the .d.ts check).
+#   Package  `pnpm check:package`: builds and packs every package with pnpm, lints the tarballs
+#            (dist-only exports, publint, attw), checks each adapter pins the core's exact
+#            version, then installs each adapter into its own scratch app outside the workspace
+#            (Vite + React, Vite + Vue, Vite + Angular) that typechecks, builds and loads its dev
+#            server.
+#   Changesets  on a pull request, `pnpm changeset status` fails when the PR changes what a
+#            package ships (`changedFilePatterns` in .changeset/config.json) without adding a
+#            changeset. Skipped for the Version Packages PR (changeset-release/*), which consumes
+#            them.
 #   E2E      the Playwright suites, in parallel jobs: the playground (Chromium and Firefox, and
 #            the `mobile` project: Chromium on a phone, real touch input), and one job per
 #            framework's examples app (every `examples/<framework>` with a playwright.config.ts,
@@ -20,6 +29,8 @@
 #
 # Tests run only on pull requests (and on a manual run): with one coordinator merging one PR at a
 # time, main is what its PR tested, and a push to main runs nothing but the www trigger.
+# The same push also runs release.yml: the Version Packages PR, or the npm publish (whose pack
+# job runs `scripts/check-package.ts --tarballs` on the very tarballs it publishes).
 
 name: CI
 
@@ -64,6 +75,50 @@ jobs:
 
       # a report, never a gate (Epic #62): the bundle sizes in the job summary
       - run: pnpm size
+
+  package:
+    name: Package
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages first, then packs, lints and smoke-tests the tarballs
+      - run: pnpm check:package
+
+  changesets:
+    name: Changesets
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `--since` diffs from the merge base with the base branch: the full history is needed
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # the root's tools only (@changesets/cli): the check reads the packages' manifests and git
+      - run: pnpm install --frozen-lockfile --filter "{.}"
+
+      - name: A changeset for every package change
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: pnpm changeset status --since="origin/$BASE_REF"
 
   e2e:
     name: E2E (playground)
