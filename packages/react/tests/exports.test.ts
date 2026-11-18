@@ -10,7 +10,6 @@ describe("@fragiola/grid-layout-react", () => {
         for (const [name, value] of Object.entries(core)) {
             expect(reexported[name], name).toBe(value);
         }
-        expect(react.VERSION).toBe("0.0.0");
     });
 
     it("gathers the parts under one namespace", () => {

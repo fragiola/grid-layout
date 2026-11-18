@@ -16,7 +16,6 @@ describe("@fragiola/grid-layout-vue", () => {
         for (const [name, value] of Object.entries(core)) {
             expect(reexported[name], name).toBe(value);
         }
-        expect(vue.VERSION).toBe("0.0.0");
     });
 
     it("has a counterpart of every React primitive and hook, under the same name", () => {

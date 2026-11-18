@@ -242,11 +242,19 @@ an implementation detail.
 | `pnpm test` | Vitest: `core` (node), `react` (jsdom), `vue` (jsdom), `angular` (jsdom, `@analogjs/vitest-angular`), `playground`, `examples-shared`, `examples-react`, `examples-vue`, `examples-angular`, `site` |
 | `pnpm bench` | Vitest benchmarks (informative, not a gate) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages, ng-packagr for Angular's, Vite for the apps), then the `.d.ts` check |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`; the Angular package, packed from its `publishConfig.directory`, has them relative to it), runs `publint` and `attw --profile esm-only` on the tarballs, then for each adapter of `ADAPTERS` (React, Vue, Angular) checks it pins the core's exact version and runs its smoke test: a scratch app outside the workspace installs that adapter's tarball only, typechecks (`tsc`, `vue-tsc`, `ngc`), builds and loads its dev server (`scripts/check-package.ts`, from Dockable; `--tarballs <dir>` checks the tarballs in `dir`, which the release workflow does on what `changeset pack` wrote) |
+| `pnpm changeset` | adds a changeset (`.changeset/*.md`): every PR that changes what a package ships (`changedFilePatterns` in `.changeset/config.json`) carries one, and CI's Changesets job fails one that does not; every package is in one `fixed` group (`@fragiola/*`), so they always share a version |
+| `pnpm release:version` | `changeset version`: bumps every package and writes their `CHANGELOG.md`. Only the release workflow runs it (the Version Packages PR); never commit a version bump by hand |
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and each framework's examples app (`examples/<framework>`: the shared specs of `examples/shared/e2e` against its own embed, Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
 | `pnpm dev` | the playground on <http://localhost:5173>: every example live, the fixtures (`PLAYGROUND_PORT` moves it) |
 | `pnpm site:export --base /grid-layout --out <dir>` | the site export for fragiola.com (contract v1.2, `../www/CONTRACT.md`), self-validated |
 | `pnpm site:dev --base /grid-layout --port 5182` | every framework's examples app with hot reload, each under `<base>/embed/<framework>/`, behind one port (a Node proxy, `site/dev-proxy.ts`) that `www` proxies in dev |
+
+Releasing is a merge: `.github/workflows/release.yml` (from Dockable) opens the Version Packages
+PR, and merging it publishes every package with pnpm through npm trusted publishing (OIDC, no
+token). After the maintainer's first `0.0.0` stub, nobody but that workflow publishes; the
+maintainer's steps are in [`docs/releasing.md`](docs/releasing.md).
 
 ## Repository layout
 
