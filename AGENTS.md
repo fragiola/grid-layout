@@ -248,7 +248,7 @@ an implementation detail.
 | `pnpm size` | the bundle sizes of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm e2e` | Playwright: the playground (Chromium, Firefox, and `mobile`: Chromium on a phone with touch) and each framework's examples app (`examples/<framework>`: the shared specs of `examples/shared/e2e` against its own embed, Chromium); `PLAYWRIGHT_WEBKIT=1` adds WebKit on an iPhone (a non-blocking CI job) |
 | `pnpm dev` | the playground on <http://localhost:5173>: every example live, the fixtures (`PLAYGROUND_PORT` moves it) |
-| `pnpm site:export --base /grid-layout --out <dir>` | the site export for fragiola.com (contract v1.2, `../www/CONTRACT.md`), self-validated |
+| `pnpm site:export --base /grid-layout --out <dir>` | the site export for fragiola.com (contract v1.7, `../www/CONTRACT.md`), self-validated |
 | `pnpm site:dev --base /grid-layout --port 5182` | every framework's examples app with hot reload, each under `<base>/embed/<framework>/`, behind one port (a Node proxy, `site/dev-proxy.ts`) that `www` proxies in dev |
 
 Releasing is a merge: `.github/workflows/release.yml` (from Dockable) opens the Version Packages
@@ -518,7 +518,7 @@ only how Angular writes it:
 ## Site
 
 The docs and examples are served by `fragiola.com/grid-layout`, built by the `www` repo from this
-repo's **site export** (`../www/CONTRACT.md`, v1.2). This repo only provides: the pages
+repo's **site export** (`../www/CONTRACT.md`, v1.7). This repo only provides: the pages
 (`site/docs`, base-free links, the v1.2 vocabulary), the gallery configuration (`examples.json`)
 and one examples app per framework of `site/project.json` (`examples/<framework>`, built for
 `<base>/embed/<framework>/`; React, Vue and Angular today), sharing `examples/shared`. A framework may ship a
