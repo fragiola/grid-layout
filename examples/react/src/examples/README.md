@@ -39,7 +39,7 @@ looking for its feature would search, and `order` is its place inside the catego
 | `mobile` | grids on a phone: long press to move, page scrolling kept, touch sources |
 | `styling` | how the grid looks when it is not about one feature: transitions, the placeholder, RTL |
 | `model-api` | the model and engine driven by the app: middleware, commands from a form, events, undo, controlled and named layouts |
-| `apps` | several features together, as an app would put them: a dashboard builder, analytics, an ops monitor, a portfolio, a photo collage, a kanban board |
+| `apps` | several features together, as an app would put them: a dashboard builder, analytics, an ops monitor, a portfolio, a photo collage, a kanban board, a live fulfillment center |
 
 ## Adding an example
 
