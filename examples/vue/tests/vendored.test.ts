@@ -25,8 +25,10 @@ const COPIES = [
 
 const SAME = [
     "catalogue",
+    "charts",
     "datasets",
     "files",
+    "fulfillment",
     "hit",
     "images",
     "layouts",
@@ -35,7 +37,10 @@ const SAME = [
     "toolbox",
     "undo",
     "widgets",
-].map((name) => `src/examples/_kit/${name}.ts`);
+]
+    .map((name) => `src/examples/_kit/${name}.ts`)
+    // an example whose looks are written through `data-*` only, so its classes are React's as they are
+    .concat("src/examples/fulfillment-center/styles.ts");
 
 const body = (source: string) => source.slice(source.indexOf("\n") + 1);
 
