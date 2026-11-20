@@ -17,7 +17,8 @@ const REPRESENTATIVE: string[] = [
     "rtl-layout", // right-to-left text and mirrored places
     "widget-sidebar", // drag sources, a drag preview and widgets of several kinds
     "dashboard-builder", // the sidebar, a trash and the app's buttons together
-    "analytics-dashboard", // the landing's showcase: charts, filters and grips in the headers
+    "analytics-dashboard", // charts, filters and grips in the headers
+    "fulfillment-center", // the landing's showcase: live values, SVG charts, status palettes
     "mobile-dashboard", // a phone frame, the press feedback
     "container-breakpoints", // two grids at two breakpoints, a range input
 ];
