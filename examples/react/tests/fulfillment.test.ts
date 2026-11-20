@@ -13,6 +13,7 @@ import {
     formatDelta,
     HISTORY,
     initialSnapshot,
+    MAX_ALERTS,
     randomSource,
 } from "../src/examples/_kit/fulfillment";
 
@@ -57,6 +58,13 @@ describe("the fulfillment simulation", () => {
         const calm = acknowledged(raised, raised.critical?.id ?? 0);
         expect(calm.critical).toBeUndefined();
         expect(calm.alerts[0]?.acknowledged).toBe(true);
+    });
+
+    it("keeps a waiting critical alert however many come after it", () => {
+        const late = run(400);
+        expect(late.alerts.length).toBeLessThanOrEqual(MAX_ALERTS);
+        expect(late.critical?.severity).toBe("critical");
+        expect(late.alerts.at(-1)).toBe(late.critical);
     });
 
     it("writes a change with its sign and a real minus", () => {

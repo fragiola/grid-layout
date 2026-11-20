@@ -75,38 +75,43 @@ const LAYOUTS: Record<string, Layout> = {
 /**
  * Grows the alerts tile while a critical alert waits and gives the rows back once it is
  * acknowledged, as commands on the model (`item.resize`): the tiles below are pushed, then
- * settle back up. `grown` remembers the breakpoint it grew on. During a gesture it waits: the
- * next tick tries again.
+ * settle back up. `grown` holds, for each breakpoint the tile grew on, its height before; each
+ * breakpoint shown while the alert waits grows too. A tile the reader resized meanwhile keeps
+ * its size unless it is still as tall as grown. During a gesture it waits: the next tick tries
+ * again.
  */
 function fitAlerts(
     grid: GridLayoutRef["current"],
     critical: boolean,
-    grown: { current: string | undefined },
+    grown: Map<string, number>,
 ) {
     if (!grid || grid.engine.get("gesture")) return;
-    if (critical && grown.current === undefined) {
+    if (critical) {
+        const breakpoint = grid.model.get("breakpoint");
         const item = grid.model.get("item-by", { itemId: "alerts" });
-        if (!item) return;
+        if (grown.has(breakpoint) || !item) return;
         const result = grid.model.run("item.resize", {
             itemId: "alerts",
             w: item.w,
             h: item.h + GROW,
         });
-        if (result.ok) grown.current = grid.model.get("breakpoint");
-    } else if (!critical && grown.current !== undefined) {
-        const breakpoint = grown.current;
-        grown.current = undefined;
+        if (result.ok) grown.set(breakpoint, item.h);
+        return;
+    }
+    for (const [breakpoint, before] of grown) {
         const item = grid.model
             .get("layout-by", { breakpoint })
             ?.find((entry) => entry.id === "alerts");
-        if (!item) return;
-        grid.model.run("item.resize", {
-            itemId: "alerts",
-            w: item.w,
-            h: Math.max(item.h - GROW, item.minH ?? 1),
-            breakpoint,
-        });
+        if (item && item.h >= before + GROW) {
+            grid.model.run("item.resize", {
+                itemId: "alerts",
+                w: item.w,
+                h: item.h - GROW,
+                breakpoint,
+            });
+        }
     }
+    grown.clear();
 }
 
 // A fulfillment center's live operations: KPI tiles, two charts drawn to their tile's size, the
@@ -122,7 +127,7 @@ const unsubscribe = feed.subscribe(() => {
 });
 const frame = useTemplateRef<HTMLElement>("frame");
 const gridLayoutRef = useGridLayoutRef();
-const grown = { current: undefined as string | undefined };
+const grown = new Map<string, number>();
 let unwatch = () => {};
 
 onMounted(() => {

@@ -407,7 +407,12 @@ export function advance(snapshot: Snapshot, random: () => number): Snapshot {
     for (const alert of raised) {
         alerts = [{ ...alert, id: nextId(alerts) }, ...alerts];
     }
+    // the oldest are dropped, never a critical alert that still waits
+    const waiting = oldestCritical(alerts);
     alerts = alerts.slice(0, MAX_ALERTS);
+    if (waiting && !alerts.includes(waiting)) {
+        alerts = [...alerts.slice(0, MAX_ALERTS - 1), waiting];
+    }
     return {
         ...snapshot,
         tick,

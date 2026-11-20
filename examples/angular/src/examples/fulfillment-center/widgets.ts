@@ -48,7 +48,7 @@ import * as styles from "./styles";
     imports: [Card],
     host: { class: "contents" },
     template: `
-        <fulfillment-card [itemId]="id()" [label]="label()">
+        <fulfillment-card [itemId]="itemId()" [label]="label()">
             <span [class]="styles.figure">
                 <span [class]="styles.value">{{ format()(series().value) }}</span>
                 <span [class]="styles.delta(series().change)">
@@ -67,7 +67,7 @@ import * as styles from "./styles";
     `,
 })
 export class Kpi {
-    readonly id = input.required<string>();
+    readonly itemId = input.required<string>();
     readonly label = input.required<string>();
     readonly series = input.required<Series>();
     readonly format = input.required<(value: number) => string>();
