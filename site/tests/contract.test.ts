@@ -14,7 +14,7 @@ import {
 } from "../contract.ts";
 import { readSite } from "../sources.ts";
 
-// The export's sources meet the site export contract (v1.2), and the checks that guarantee it
+// The export's sources meet the site export contract (v1.7), and the checks that guarantee it
 // catch what `www` would reject: each case below breaks one rule on a copy of the real site.
 
 let site: Site;
@@ -215,6 +215,24 @@ describe("the contract checks", () => {
             'no example "nope"',
         );
         expect(problemsOf("[x](#nope)").join()).toContain("no heading #nope");
+    });
+
+    it("accept the reserved v1.7 /ai link, with an anchor, and nothing below it", () => {
+        expect(problemsOf("[x](/ai)")).toEqual([]);
+        expect(problemsOf("[x](/ai#set-it-up-in-your-client)")).toEqual([]);
+        expect(
+            validateSite(
+                withPage(
+                    "index",
+                    `${LANDING}\n\n<Hero title="t" actions={[{ label: "Agent", href: "/ai", variant: "secondary" }]} />\n`,
+                ),
+            ),
+        ).toEqual([]);
+        for (const href of ["/ai/x", "/ai/docs/mcp"]) {
+            expect(problemsOf(`[x](${href})`).join()).toContain(
+                "linked as /ai (optionally /ai#anchor)",
+            );
+        }
     });
 
     it("reject a code block without a language, and ESM", () => {
