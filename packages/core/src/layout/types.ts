@@ -34,6 +34,8 @@ export interface LayoutItem {
     readonly draggable?: boolean | undefined;
     /** overrides the grid's `resizable` for this item */
     readonly resizable?: boolean | undefined;
+    /** overrides the grid's `bounded` for this item: kept inside the root while it is dragged */
+    readonly bounded?: boolean | undefined;
     /** its own constraints, after the grid's: names the model's registry holds (K3) */
     readonly constraints?: readonly ItemConstraint[] | undefined;
 }

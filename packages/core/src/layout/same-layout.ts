@@ -17,6 +17,7 @@ const ITEM_KEYS = [
     "static",
     "draggable",
     "resizable",
+    "bounded",
     "constraints",
 ] as const satisfies readonly (keyof LayoutItem)[];
 

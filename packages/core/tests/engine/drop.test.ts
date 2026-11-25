@@ -799,6 +799,46 @@ describe("dragging an item off the grid", () => {
         expect(bounded.view().gesture?.outside).toBe(false);
         held.release(1300, 20);
     });
+
+    it("follows the item's own bounded over the grid's", () => {
+        // bounded: true on an unbounded grid stays inside, and is not reported off the grid
+        const kept = setup({
+            layout: [
+                { ...item("a", 0, 0, 2, 2), bounded: true },
+                item("b", 2, 0, 2, 2),
+            ],
+        });
+        let press = pointer(kept.item("a"), 20, 20);
+        press.move(1300, 20);
+        expect(kept.view().gesture?.outside).toBe(false);
+        press.release(1300, 20);
+        expect(kept.events.at(-1)).toMatchObject({
+            type: "drag-stop",
+            outside: false,
+        });
+        expect(kept.model.get("item-by", { itemId: "a" })).toMatchObject({
+            x: 10,
+        });
+
+        // bounded: false on a bounded grid leaves it, and its release is reported
+        const free = setup({
+            layout: [
+                { ...item("a", 0, 0, 2, 2), bounded: false },
+                item("b", 2, 0, 2, 2),
+            ],
+            engine: { bounded: true },
+        });
+        const told = changes(free);
+        press = pointer(free.item("a"), 20, 20);
+        press.move(1300, 20);
+        expect(free.view().gesture?.outside).toBe(true);
+        press.release(1300, 20);
+        expect(told).toHaveLength(0);
+        expect(free.events.at(-1)).toMatchObject({
+            type: "drag-stop",
+            outside: true,
+        });
+    });
 });
 
 describe("listeners", () => {

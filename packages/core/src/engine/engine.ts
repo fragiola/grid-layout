@@ -958,13 +958,14 @@ export function createGridLayoutEngine(
 
     // ─── pointer gestures ───────────────────────────────────────────────────────────────────
 
-    /** A box of `size` at `left`/`top`, kept inside the root when the grid is bounded. */
+    /** A box of `size` at `left`/`top`, kept inside the root when `bounded`. */
     function bound(
         left: number,
         top: number,
         size: PixelRect,
+        bounded: boolean,
     ): { left: number; top: number } {
-        if (!settings.bounded) return { left, top };
+        if (!bounded) return { left, top };
         // the layout's height with autoSize, the root's own otherwise (none: unbounded), down to
         // what its scroll shows
         const height = settings.autoSize
@@ -1056,7 +1057,12 @@ export function createGridLayoutEngine(
                 left: point.x - start.width / 2 + dx,
                 top: point.y - start.height / 2 + (offset?.y ?? 0) / scale.y,
             };
-            const { left, top } = bound(at.left, at.top, start);
+            const { left, top } = bound(
+                at.left,
+                at.top,
+                start,
+                settings.bounded,
+            );
             target = cellFor(geometry, left, top, current.before);
             outside = offGrid(at, box);
         } else if (current.kind === "move") {
@@ -1065,12 +1071,14 @@ export function createGridLayoutEngine(
                 left: point.x - current.grab.x,
                 top: point.y - current.grab.y,
             };
-            const { left, top } = bound(at.left, at.top, start);
+            // the item's own `bounded` wins over the grid's
+            const bounded = current.before.bounded ?? settings.bounded;
+            const { left, top } = bound(at.left, at.top, start, bounded);
             if (current.element)
                 place(current.element, { ...start, left, top });
             target = cellFor(geometry, left, top, current.before);
             // a bounded item never leaves the grid; off it, an unbounded one goes back
-            outside = !settings.bounded && offGrid(at, box);
+            outside = !bounded && offGrid(at, box);
         } else {
             const edges = sideEdges(current.side ?? "bottom-end");
             const { inline, block } = edges;

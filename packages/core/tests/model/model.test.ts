@@ -7,6 +7,7 @@ import {
 } from "../../src/layout/compact";
 import { defaultConstraints } from "../../src/layout/constraints";
 import { compactLayout } from "../../src/layout/edit";
+import { sameLayout } from "../../src/layout/same-layout";
 import type { Layout, LayoutItem } from "../../src/layout/types";
 import {
     COMMANDS,
@@ -258,6 +259,32 @@ describe("the commands", () => {
         expect(model.is("item-resizable-by", { itemId: "b" })).toBe(false);
         expect(
             model.run("item.configure", { itemId: "b", settings: { minW: 0 } }),
+        ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
+    });
+
+    it("item.configure sets and clears an item's bounded, a layout keeps it", () => {
+        const model = createGridLayoutModel({
+            cols: 4,
+            layout: [{ id: "a", x: 0, y: 0, w: 1, h: 1, bounded: true }],
+        });
+        expect(model.get("item-by", { itemId: "a" })?.bounded).toBe(true);
+        const before = model.get("layout");
+        model.run("item.configure", {
+            itemId: "a",
+            settings: { bounded: false },
+        });
+        expect(model.get("item-by", { itemId: "a" })?.bounded).toBe(false);
+        expect(sameLayout(before, model.get("layout"))).toBe(false);
+        model.run("item.configure", {
+            itemId: "a",
+            settings: { bounded: undefined },
+        });
+        expect(model.get("item-by", { itemId: "a" })?.bounded).toBeUndefined();
+        expect(
+            model.run("item.configure", {
+                itemId: "a",
+                settings: { bounded: "yes" as unknown as boolean },
+            }),
         ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
     });
 

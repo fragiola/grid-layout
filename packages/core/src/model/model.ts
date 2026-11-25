@@ -244,6 +244,7 @@ const ITEM_SETTINGS = [
     "static",
     "draggable",
     "resizable",
+    "bounded",
     "constraints",
 ] as const satisfies readonly (keyof ItemSettings)[];
 
@@ -589,7 +590,12 @@ const handlers: Handlers = {
         }
         const shape = itemConstraintsShapeProblem(settings.constraints);
         need(shape === undefined, shape ?? "");
-        for (const key of ["static", "draggable", "resizable"] as const) {
+        for (const key of [
+            "static",
+            "draggable",
+            "resizable",
+            "bounded",
+        ] as const) {
             const value = settings[key];
             need(
                 value === undefined || typeof value === "boolean",
