@@ -93,6 +93,7 @@ export type ItemSettings = Partial<
         | "static"
         | "draggable"
         | "resizable"
+        | "bounded"
         | "constraints"
     >
 >;

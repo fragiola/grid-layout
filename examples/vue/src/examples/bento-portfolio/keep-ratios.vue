@@ -1,5 +1,5 @@
 <!--
-Workaround (docs/examples-gaps.md, E8): a pixel constraint applies when an item is moved or
+Workaround (docs/examples-gaps.md): a pixel constraint applies when an item is moved or
 resized, not when the layout loads or the grid's width changes, and the rows a ratio needs
 depend on the width. Once the width is known, and whenever it changes, each constrained item
 is resized to its own size with the engine's pixels, which settles its height.

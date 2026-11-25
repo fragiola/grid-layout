@@ -217,8 +217,8 @@ responsive grid. In 2.2.4 both pass `isBounded` alike, but `bounded` lives in `d
 and as a flat prop in the legacy API, and a per-item `isBounded` on top.
 
 **Verdict: solved by design.** One Root, responsive or not (R2), with one set of options
-(`threshold` 3 by default, `bounded` grid-wide); no legacy API (exclusion E2 in the parity
-report). A per-item `bounded` is gap G1 there.
+(`threshold` 3 by default, `bounded` on the root, which an item's own `bounded` overrides); no
+legacy API (exclusion E2 in the parity report).
 
 ## Open issues
 

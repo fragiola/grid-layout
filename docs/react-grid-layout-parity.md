@@ -4,8 +4,7 @@ What Grid Layout does for each thing React Grid Layout offers: each of its examp
 feature of its v2 API. Decision P1 of Epic #22 sets the bar: **parity is behaviour, not API**. A
 feature has parity when an app can get the same behaviour, through an example of ours or through
 our API, even when the names and shapes differ. What we leave out on purpose is recorded with its
-reason. What we neither have nor exclude is a **gap**, listed at the end with a proposal, for the
-maintainer to decide.
+reason. Every feature has one of these answers.
 
 The reference is React Grid Layout 2.2.4 (`../react-grid-layout`, read-only), its source as of
 2026-10-05: `test/examples` (00–21), the Playwright harness (`test/e2e`), `src/core/types.ts`,
@@ -23,27 +22,26 @@ Each row says how Grid Layout covers the feature:
 - **by design**: one of our decisions (D1–D14, X1–X6, R1–R6, K1–K6 in `AGENTS.md`) gives the
   behaviour another way, or makes the feature unneeded.
 - **excluded**: left out on purpose; the reason is in [Exclusions](#exclusions).
-- **gap**: none of the above; see [Gaps](#gaps).
 
 ## Summary
 
-| section | rows | example | API | by design | excluded | gap |
-|---|---|---|---|---|---|---|
-| [Examples](#examples) | 27 | 26 | 0 | 0 | 1 | 0 |
-| [Layout item](#layout-item) | 16 | 6 | 7 | 2 | 0 | 1 |
-| [Grid](#grid) | 10 | 4 | 5 | 1 | 0 | 0 |
-| [Drag](#drag) | 7 | 4 | 2 | 1 | 0 | 0 |
-| [Resize](#resize) | 4 | 3 | 1 | 0 | 0 | 0 |
-| [Drop](#drop) | 8 | 5 | 2 | 0 | 0 | 1 |
-| [Compaction](#compaction) | 13 | 7 | 4 | 0 | 2 | 0 |
-| [Constraints](#constraints) | 13 | 6 | 6 | 1 | 0 | 0 |
-| [Responsive](#responsive) | 10 | 5 | 4 | 1 | 0 | 0 |
-| [Positioning](#positioning) | 5 | 1 | 0 | 1 | 3 | 0 |
-| [Callbacks](#callbacks) | 12 | 7 | 5 | 0 | 0 | 0 |
-| [Hooks](#hooks) | 5 | 2 | 2 | 1 | 0 | 0 |
-| [Components and extras](#components-and-extras) | 9 | 5 | 0 | 0 | 4 | 0 |
-| [Core functions](#core-functions) | 20 | 0 | 16 | 4 | 0 | 0 |
-| **total** | **159** | **81** | **54** | **12** | **10** | **2** |
+| section | rows | example | API | by design | excluded |
+|---|---|---|---|---|---|
+| [Examples](#examples) | 27 | 26 | 0 | 0 | 1 |
+| [Layout item](#layout-item) | 16 | 6 | 8 | 2 | 0 |
+| [Grid](#grid) | 10 | 4 | 5 | 1 | 0 |
+| [Drag](#drag) | 7 | 4 | 2 | 1 | 0 |
+| [Resize](#resize) | 4 | 3 | 1 | 0 | 0 |
+| [Drop](#drop) | 8 | 5 | 3 | 0 | 0 |
+| [Compaction](#compaction) | 13 | 7 | 4 | 0 | 2 |
+| [Constraints](#constraints) | 13 | 6 | 6 | 1 | 0 |
+| [Responsive](#responsive) | 10 | 5 | 4 | 1 | 0 |
+| [Positioning](#positioning) | 5 | 1 | 0 | 1 | 3 |
+| [Callbacks](#callbacks) | 12 | 7 | 5 | 0 | 0 |
+| [Hooks](#hooks) | 5 | 2 | 2 | 1 | 0 |
+| [Components and extras](#components-and-extras) | 9 | 5 | 0 | 0 | 4 |
+| [Core functions](#core-functions) | 20 | 0 | 16 | 4 | 0 |
+| **total** | **159** | **81** | **56** | **12** | **10** |
 
 ## Examples
 
@@ -94,7 +92,7 @@ React Grid Layout's `LayoutItem` (`src/core/types.ts`) against ours (`packages/c
 | `isDraggable` | `draggable` | example | [`read-only`](/examples/read-only) |
 | `isResizable` | `resizable` | example | [`home-screen`](/examples/home-screen) |
 | `resizeHandles` (per item) | the `GridLayout.ResizeHandle` parts the app renders in that item | API | the developer owns the recursion (D4): each item renders the sides it wants |
-| `isBounded` (per item) | — | gap | [G1](#gaps); the grid-wide `bounded` and an item's `containerBounds` constraint cover part of it |
+| `isBounded` (per item) | `bounded` | API | overrides Root's `bounded` for that item, both ways, as `draggable` and `resizable` do |
 | `constraints` (objects) | `constraints`: names or `{ name, args }` from Root's `constraintRegistry` | API | K3: a layout stays data and serialises |
 | `moved` (internal) | — | by design | a working flag of the move algorithm; ours keeps it on a working copy, never on the layout (D6) |
 | `y: Infinity` (add at the bottom) | the same, or `item.add` without `x`/`y` (first free cell) | API | [`add-remove-items`](/examples/add-remove-items); placed below everything under every compactor (react-grid-layout#2161) |
@@ -155,7 +153,7 @@ React Grid Layout's `LayoutItem` (`src/core/types.ts`) against ours (`packages/c
 | `dropConfig.defaultItem` / `droppingItem` | the source's `item` (`{ w, h, min…, max… }`), or the `{ w, h }` `onExternalDrag` answers | example | [`widget-sidebar`](/examples/widget-sidebar) |
 | `droppingItem.i` | the source's `itemId`, else Root's `createId`, else a random UUID | API | X2 |
 | `dropConfig.onDragOver` / `onDropDragOver` → `{ w, h }`, `false` | `onExternalDrag(event)` → `{ w, h, data? }`, `false`, `undefined` | example | [`drop-files`](/examples/drop-files); asked again on the drop, when files can be read (X1) |
-| `onDropDragOver` → `dragOffsetX`, `dragOffsetY` | a drag source's `dragOffset`; `onExternalDrag`'s answer takes `dragOffset` too | API | added by Epic #22 (G2, a small option) |
+| `onDropDragOver` → `dragOffsetX`, `dragOffsetY` | a drag source's `dragOffset`; `onExternalDrag`'s answer takes `dragOffset` too | API | added by Epic #22 (a small option) |
 | `dropConfig.touchEnabled`, `touchDragSource` (`[data-rgl-draggable]`) | drag sources are pointer-based: touch works as a mouse does | example | [`widget-sheet`](/examples/widget-sheet) (X1) |
 | the dropped item centred on the pointer (2.1) | the same, moved by `dragOffset`, mirrored in RTL | API | X2 |
 | refusing a drop | `onExternalDrag` → `false`, or a middleware on `item.add` | example | [`drop-rules`](/examples/drop-rules) |
@@ -331,21 +329,3 @@ section's too. Each is behaviour an app gets another way, or a look the package 
 - **E6. `react-draggable` and `react-resizable`.** Gestures are Pointer Events with pointer
   capture, one path for mouse, touch and pen (D7); no drag, resize or gesture library anywhere in
   the packages (D12).
-
-## Gaps
-
-React Grid Layout features with neither an equivalent nor an exclusion. P1 makes each a stop
-condition: the maintainer decides before this Epic adds any API beyond a small option.
-
-- **G1. A per-item `isBounded`.** React Grid Layout's `LayoutItem.isBounded` keeps one item inside
-  the container while the others may leave it. Here `bounded` is grid-wide (the drawn item is held
-  inside the root, X3's drag-out never happens); per item, a `containerBounds` constraint (K3)
-  bounds where the item lands, but the drawn item still follows the pointer off the grid and X3
-  puts it back. **Proposal:** an optional `bounded?: boolean` on `LayoutItem`, overriding Root's
-  `bounded` for that item as `draggable` and `resizable` already do (read by the engine in
-  `bound()` and the X3 check). It is a flag, not geometry, like the two it sits beside.
-- **G2. A drag offset for native drags** (closed in this Epic). `onDropDragOver` can answer
-  `dragOffsetX`/`dragOffsetY` for any HTML5 drag; `onExternalDrag`'s answer now takes
-  `dragOffset?: { x, y }`, used as a drag source's is (a small option, P1).
-
-G1 waits for the maintainer: it adds a field to `LayoutItem` (D3). It is on the roadmap.

@@ -25,6 +25,8 @@ import { GridLayout, noCompactor } from "@fragiola/grid-layout-react";
 
 - `preventCollision` refuses a move or resize into an occupied cell instead of pushing: the item
   goes back, and a command answers `collision`.
-- `allowOverlap` lets items stack: nothing is pushed and nothing settles.
+- `allowOverlap` lets items stack: nothing is pushed and nothing settles. The layout's order is
+  the drawing order, later items above earlier ones; to bring an item to front, move it to the
+  end of the layout. The item held is drawn above the others while it is held.
 
 <Example id="compaction-modes" />

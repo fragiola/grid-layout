@@ -46,7 +46,7 @@ an implementation detail.
    lighter header `// From Data Grid (fragiola/data-grid, <path>), same author and licence.`
    (or Dockable's).
 3. **Hybrid state (D3).** The **model** holds the grid's rules and data: the items
-   (`LayoutItem = { id, x, y, w, h, minW?, maxW?, minH?, maxH?, static?, draggable?, resizable? }`
+   (`LayoutItem = { id, x, y, w, h, minW?, maxW?, minH?, maxH?, static?, draggable?, resizable?, bounded? }`
    in grid units, `x` from the inline-start edge), `cols`, `maxRows` and the compaction (the
    compactor, `preventCollision`, `allowOverlap`). It stores layouts **per breakpoint** (one
    implicit breakpoint until responsive grids). Every change is a command through a middleware
@@ -141,7 +141,8 @@ an implementation detail.
     `data-outside` marks the item and the root and the preview puts it back in its cell. A release
     there runs **no command**: `onDragStop` gets `outside: true` and `target` (the element under
     the pointer, past the held item). Removing it is the app's (D14). A `bounded` grid never lets
-    an item out.
+    an item out; an item's own `bounded` overrides the grid's for that item (`true` keeps it in,
+    `false` lets it out).
 18. **The layout stays geometry (X4).** `LayoutItem` has no `data` and no generic: a drop's data
     travels only in the gesture's events and `onDrop`; the app maps ids to its content.
 19. **`gridLayoutRef` (X5).** `createGridLayoutRef()` / `useGridLayoutRef()` (Data Grid's
