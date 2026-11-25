@@ -125,7 +125,8 @@ the element under the pointer. Removing the item, or keeping it in a toolbox, is
 >
 ```
 
-A `bounded` grid never lets an item out.
+A `bounded` grid never lets an item out, unless the item's own `bounded` is `false`; an item with
+`bounded: true` never leaves any grid.
 
 <Example id="toolbox" />
 

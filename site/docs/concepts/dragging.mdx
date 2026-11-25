@@ -22,6 +22,8 @@ else.
 
 Releasing commits the move. Escape, a pointer cancelled by the browser, a lost capture or a move
 with no button put the item back, and nothing is told. The click a drag ends with is swallowed.
-`bounded` keeps the dragged item inside the root.
+`bounded` keeps the dragged item inside the root. An item's own `bounded` overrides the grid's for
+that item: `true` keeps one item in on a grid that lets the others out, `false` lets one item out
+of a bounded grid.
 
 <Example id="drag-handle" />
