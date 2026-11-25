@@ -150,11 +150,12 @@
             ]
         },
         {
-            "label": "Project",
+            "label": "More",
             "pages": [
                 {
-                    "label": "Limitations and roadmap",
-                    "path": "limitations"
+                    "label": "Found a problem?",
+                    "href": "https://github.com/fragiola/grid-layout/issues",
+                    "external": true
                 }
             ]
         }

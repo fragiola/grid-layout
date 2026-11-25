@@ -38,7 +38,9 @@ A mouse and a pen never wait.
 
 A **drag handle**, a **resize handle** and a **drag source** start as soon as the finger moves
 past the threshold. Their `touch-action: none` makes their touches drags, never scrolls. An item
-with a drag handle drags only from it, at once; its body scrolls the page.
+with a drag handle drags only from it, at once; its body scrolls the page. A sidebar of drag
+sources scrolls from the room between them, not from the sources: leave some, as this sheet does
+at its edges.
 
 Give handles a hit area a finger can find: about 44 pixels. Their size and place are yours, set
 in your CSS.

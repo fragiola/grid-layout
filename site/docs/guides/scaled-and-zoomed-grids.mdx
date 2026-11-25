@@ -27,6 +27,7 @@ does not show), give it:
 A drag source's `dragOffset` is on screen, in the page's pixels: the engine divides it by the scale
 too.
 
-A rotated or skewed parent is not supported.
+Only a scale is read off the root's box: a rotated or skewed parent is not. Keep rotations outside
+the grid's ancestors.
 
 <Example id="scaled-container" />

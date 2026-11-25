@@ -34,7 +34,8 @@ exactly 996 pixels, `md` above. It tells each change once, with the new breakpoi
 `useBreakpoint()` inside the root, or `useBreakpoint(gridLayoutRef)` anywhere, gives
 `{ breakpoint, cols, width }`, and the root carries `data-breakpoint`.
 
-- **`breakpoint`** controls it: the grid stays there whatever its width.
+- **`breakpoint`** controls it: the grid stays there whatever its width. A breakpoint chosen by
+  the window's width comes from your own media query, passed as `breakpoint`.
 - **`defaultBreakpoint`** is where it starts before it is measured, as on a server render.
 - A width wavering at a threshold, when the new breakpoint's layout brings a scrollbar, settles.
   To cross back the threshold it just crossed, the width must go 24 pixels past it.
@@ -64,8 +65,9 @@ same twelve columns at every breakpoint and only the widths changing:
 
 Every breakpoint shows the same items, each in its own place. An item added or removed on one
 breakpoint is added to or removed from the others when they are next active: added below
-everything at the column it has, then settled. Hiding an item on one breakpoint only is not
-possible yet.
+everything at the column it has, then settled. To leave an item out of one breakpoint, remove it
+while that breakpoint is active (`onBreakpointChange` tells when) and add it back when another one
+is.
 
 ## Geometry per breakpoint
 

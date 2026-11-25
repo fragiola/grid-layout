@@ -38,7 +38,8 @@ const CONSTRAINTS = [gridBounds, minMaxSize, snapToGrid(2)];
 Without a `constraints` prop a grid has `defaultConstraints`: `gridBounds`, then `minMaxSize`.
 Leaving one out lifts its rule: without `minMaxSize`, an item's own limits no longer bound a
 resize. Whatever the constraints say, an item stays inside the columns: a committed layout is
-always valid.
+always valid. `boundedY`, or a grid with no constraints at all, still never lets an item past the
+last column; for more room, add columns, or use `allowOverlap` with a wider grid.
 
 A factory given bad values (`snapToGrid(0)`, `aspectRatio(-1)`) never throws: it returns a
 constraint whose `invalid` says why, and the grid refuses it like any invalid option.
@@ -113,7 +114,8 @@ model.run(
 ```
 
 `aspectRatio` counts the gap between rows and the grid's padding, so the ratio holds in pixels as
-closely as whole rows allow: within half a row.
+closely as whole rows allow: within half a row. For a ratio within a pixel, use small rows (a
+`rowHeight` of a few pixels and a row gap of 0).
 
 ## When they apply
 

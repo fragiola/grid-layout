@@ -109,13 +109,21 @@ It returns the item to drop and its `data`, `false` to refuse the drag (the root
 gives the drop's data. The size stays the one shown. A `dragOffset` (`{ x, y }`, pixels on screen)
 places the item away from the pointer, as a drag source's does.
 
+The grid counts the drag's enter and leave events and reads where a leave goes, so a drag passing
+over items inside the grid stays one drag. No class name is set on the element dragged over, as
+React Grid Layout's Firefox workaround does. The end-to-end tests drive these drags with synthetic
+events in Chromium and Firefox: report a browser where a file drag over items behaves otherwise.
+
 <Example id="drop-files" />
 
 ## Dragging out
 
 An item dragged off the grid goes back in the preview (`data-outside` on the item and the root),
 and released there it runs no command. `onDragStop` reports it with `outside: true` and `target`,
-the element under the pointer. Removing the item, or keeping it in a toolbox, is yours.
+the element under the pointer. Removing the item, or keeping it in a toolbox, is yours. To move
+an item into another grid, remove it here and bring it into the other one from a drag source, as
+the toolbox below does. A drag out is a pointer gesture of the page: to hand an item to another
+app, give it another way (a button, the clipboard).
 
 ```tsx title="trash.tsx"
 <GridLayout.Root
